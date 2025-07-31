@@ -1,0 +1,118 @@
+{
+  "title": "Memory Leak Detection Dashboard",
+  "timezone": "browser",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Memory Growth Rate (Should be ~0 for healthy apps)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "deriv(nodejs_memory_usage_bytes{type=\"heap_used\"}[10m])",
+          "legendFormat": "Heap Growth Rate"
+        },
+        {
+          "expr": "deriv(nodejs_memory_usage_bytes{type=\"rss\"}[10m])",
+          "legendFormat": "RSS Growth Rate"
+        }
+      ],
+      "alert": {
+        "conditions": [
+          {
+            "query": "A",
+            "reducer": { "type": "avg" },
+            "evaluator": { "params": [1048576], "type": "gt" }
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "title": "Memory Leaking Endpoints (Positive = Memory Not Released)",
+      "type": "table",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (route, method) (http_endpoint_memory_delta_mb_sum) / sum by (route, method) (http_endpoint_memory_delta_mb_count)",
+          "legendFormat": "{{method}} {{route}}",
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "Value": "Avg Memory Delta (MB)"
+            }
+          }
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "id": 3,
+      "title": "Garbage Collection Frequency (More GC = Memory Pressure)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(nodejs_gc_duration_seconds_count{kind=\"major\"}[5m])",
+          "legendFormat": "Major GC/sec"
+        },
+        {
+          "expr": "rate(nodejs_gc_duration_seconds_count{kind=\"minor\"}[5m])",
+          "legendFormat": "Minor GC/sec"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "id": 4,
+      "title": "Event Loop Lag (High = Memory/CPU Issues)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "nodejs_eventloop_lag_seconds * 1000",
+          "legendFormat": "Event Loop Lag (ms)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    },
+    {
+      "id": 5,
+      "title": "Memory Trend Over Time (Should be sawtooth, not climbing)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "nodejs_memory_usage_bytes{type=\"heap_used\"} / 1024 / 1024",
+          "legendFormat": "Heap Used (MB)"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "10s"
+}
