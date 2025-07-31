@@ -7,6 +7,9 @@ export class MemoryStressController {
   private memoryLeaks: any[] = [];
   private intervalRefs: NodeJS.Timeout[] = [];
 
+  /**
+   * Allocate external memory
+   */
   @Post('allocate-memory')
   allocateMemory(
     @Query('sizeMB') sizeMB: string = '50',
@@ -40,6 +43,9 @@ export class MemoryStressController {
     }
   }
 
+  /**
+   * Old memory(long lived) -> cannot be cleaned by GC(circular deps)
+   */
   @Post('create-memory-leak')
   createMemoryLeak(@Query('intervalMs') intervalMs: string = '1000') {
     const interval = parseInt(intervalMs, 10);
@@ -49,10 +55,10 @@ export class MemoryStressController {
         id: Date.now(),
         data: new Array(10000).fill('memory leak data'),
         timestamp: new Date(),
-        reference: this.memoryLeaks,
+        reference: this.memoryLeaks, // creates circular dependency
       };
 
-      this.memoryLeaks.push(leak);
+      this.memoryLeaks.push(leak); // creates circular dependency
 
       memoryStressStorage.set(`leak_${leak.id}`, leak);
     }, interval);
@@ -67,6 +73,9 @@ export class MemoryStressController {
     };
   }
 
+  /**
+   * Initally NEW space, then will move to OLD memory due to largeArray.push(obj)
+   */
   @Post('stress-heap')
   stressHeap(
     @Query('iterations') iterations: string = '1000000',
@@ -118,6 +127,11 @@ export class MemoryStressController {
     }
   }
 
+  /**
+   * Initally NEW space, then might move to OLD memory
+   * depending on depth on how much data is in accumulator
+   * i.e. if cannot be cleared by minor GC
+   */
   @Post('recursive-function')
   recursiveFunction(@Query('depth') depth: string = '10000') {
     const maxDepth = parseInt(depth, 10);
@@ -157,6 +171,10 @@ export class MemoryStressController {
     }
   }
 
+  /**
+   * Initally NEW space, then might move to OLD memory
+   * And due to Buffer.alloc also external
+   */
   @Post('simulate-real-usage')
   simulateRealUsage(@Query('users') users: string = '1000') {
     const numUsers = parseInt(users, 10);
@@ -164,22 +182,22 @@ export class MemoryStressController {
     for (let i = 0; i < numUsers; i++) {
       const userData = {
         userId: i,
-        sessionData: new Array(100).fill(`session_data_${i}`),
+        sessionData: new Array(100).fill(`session_data_${i}`), // ← NEW initially
         cachedQueries: new Array(50).fill({
           query: `SELECT * FROM users WHERE id = ${i}`,
           result: new Array(20).fill(`cached_result_${i}`),
           timestamp: Date.now(),
-        }),
+        }), // ← NEW initially
         temporaryFiles: new Array(10).fill(
-          Buffer.alloc(1024, 'temp_file_data'),
+          Buffer.alloc(1024, 'temp_file_data'), // External
         ),
         connections: new Array(5).fill({
           id: `conn_${i}`,
           data: new Array(30).fill(`connection_data_${i}`),
-        }),
+        }), // ← NEW initially
       };
 
-      memoryStressStorage.set(`user_${i}`, userData);
+      memoryStressStorage.set(`user_${i}`, userData); // OLD
     }
 
     return {
@@ -191,6 +209,9 @@ export class MemoryStressController {
     };
   }
 
+  /**
+   * Similate CPU load
+   */
   @Post('cpu-intensive')
   cpuIntensiveTask(
     @Query('duration') duration: string = '5000',
