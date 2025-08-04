@@ -22,7 +22,7 @@ RUN npm run build
 RUN mkdir -p heap-snapshots cpu-profiles
 
 # Set memory limits via environment
-ENV NODE_OPTIONS="--max-old-space-size=400 --expose-gc"
+ENV NODE_OPTIONS="--max-old-space-size=200 --expose-gc"
 
 # Expose port
 EXPOSE 3000
