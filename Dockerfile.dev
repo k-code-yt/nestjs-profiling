@@ -2,30 +2,18 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install curl for healthcheck
 RUN apk add --no-cache curl
 
-# Copy package files
-COPY package.json ./
-COPY yarn.lock ./
+COPY package.json yarn.lock ./
 
-# Install dependencies
-RUN yarn
+RUN yarn install --frozen-lockfile
 
-# Copy source code
 COPY . .
 
-# Build the application
-RUN yarn build
-
-# Create directories for profiling output
 RUN mkdir -p heap-snapshots cpu-profiles
 
-# Set memory limits via environment
 ENV NODE_OPTIONS="--max-old-space-size=200 --expose-gc"
 
-# Expose port
 EXPOSE 3000 9229
 
-# Start with hot reload
-CMD ["npm", "run", "start:dev"]
+CMD ["yarn", "start:debug"]

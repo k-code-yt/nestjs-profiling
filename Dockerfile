@@ -16,7 +16,7 @@ RUN yarn
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN yarn build
 
 # Create directories for profiling output
 RUN mkdir -p heap-snapshots cpu-profiles

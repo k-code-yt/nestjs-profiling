@@ -19,6 +19,12 @@ export class PrometheusMetricsService {
   private readonly endpointMemoryGauge: Gauge<string>;
   private readonly endpointMemoryDeltaHistogram: Histogram<string>;
 
+  private readonly wsConnectionsTotal: Counter<string>;
+  private readonly wsMemoryUsage: Gauge<string>;
+  private readonly wsMessageCounter: Counter<string>;
+  private readonly wsMemoryDelta: Histogram<string>;
+  private readonly wsMessageDuration: Histogram<string>;
+
   constructor() {
     // Collect default Node.js metrics
     collectDefaultMetrics({ register });
@@ -80,6 +86,40 @@ export class PrometheusMetricsService {
       buckets: [-20, -10, -5, -1, 0, 1, 5, 10, 20, 50],
     });
 
+    this.wsConnectionsTotal = new Counter({
+      name: 'websocket_connections_total',
+      help: 'Total WebSocket connections',
+      labelNames: ['event', 'client_id'],
+    });
+
+    this.wsMemoryUsage = new Gauge({
+      name: 'websocket_memory_usage_bytes',
+      help: 'Current memory usage during WebSocket operations',
+      labelNames: ['event'],
+    });
+
+    this.wsMessageCounter = new Counter({
+      name: 'websocket_messages_total',
+      help: 'Total WebSocket messages processed',
+      labelNames: ['event'],
+    });
+
+    this.wsMemoryDelta = new Histogram({
+      name: 'websocket_memory_delta_bytes',
+      help: 'Memory delta per WebSocket message',
+      labelNames: ['event'],
+      buckets: [
+        -1048576, -524288, -262144, 0, 262144, 524288, 1048576, 2097152,
+      ],
+    });
+
+    this.wsMessageDuration = new Histogram({
+      name: 'websocket_message_duration_seconds',
+      help: 'WebSocket message processing duration',
+      labelNames: ['event'],
+      buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+    });
+
     // Start periodic memory collection
     this.startMemoryCollection();
   }
@@ -136,9 +176,9 @@ export class PrometheusMetricsService {
    * Start periodic memory collection
    */
   private startMemoryCollection() {
-    setInterval(() => {
-      this.updateMemoryMetrics();
-    }, 10000); // Every 10 seconds
+    // setInterval(() => {
+    //   this.updateMemoryMetrics();
+    // }, 10000); // Every 10 seconds
   }
 
   /**
@@ -193,5 +233,21 @@ export class PrometheusMetricsService {
       help,
       labelNames,
     });
+  }
+
+  recordWebSocketConnection(
+    event: string,
+    clientId: string,
+    memoryUsed: number,
+  ) {
+    this.wsConnectionsTotal.inc({ event, client_id: clientId.substring(0, 8) });
+    this.wsMemoryUsage.set({ event }, memoryUsed);
+  }
+
+  recordWebSocketMessage(event: string, memoryDelta: number, duration: number) {
+    this.wsMessageCounter.inc({ event });
+    this.wsMemoryDelta.observe({ event }, memoryDelta);
+    this.wsMessageDuration.observe({ event }, duration);
+    Logger.debug(`recording WS for event: ${event}`);
   }
 }

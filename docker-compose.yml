@@ -2,10 +2,11 @@ services:
   nestjs-app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: nestjs-memory-profiling
     ports:
       - '3000:3000'
+      - '9229:9229'
     environment:
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=200 --expose-gc
@@ -24,18 +25,7 @@ services:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          'CMD',
-          'wget',
-          '--no-verbose',
-          '--tries=1',
-          '--spider',
-          'http://localhost:3000/profiling/health',
-          '||',
-          'exit',
-          '1',
-        ]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/profiling/health']
       interval: 30s
       timeout: 10s
       retries: 3

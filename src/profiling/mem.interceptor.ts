@@ -56,7 +56,10 @@ export class MemoryTrackingInterceptor implements NestInterceptor {
           timestamp: new Date().toISOString(),
         };
 
-        if (Math.abs(memoryDelta.heapUsed) > 10 || duration > 5000) {
+        if (
+          (Math.abs(memoryDelta.heapUsed) > 10 || duration > 5000) &&
+          !requestInfo.url.includes('sse')
+        ) {
           this.logger.warn('High memory/slow request detected', requestInfo);
         }
 
