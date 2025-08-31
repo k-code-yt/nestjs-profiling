@@ -12,7 +12,7 @@ COPY . .
 
 RUN mkdir -p heap-snapshots cpu-profiles
 
-ENV NODE_OPTIONS="--max-old-space-size=200 --expose-gc"
+ENV NODE_OPTIONS="--max-old-space-size=1000 --expose-gc"
 
 EXPOSE 3000 9229
 

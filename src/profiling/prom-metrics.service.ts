@@ -93,7 +93,7 @@ export class PrometheusMetricsService {
     });
 
     this.wsMemoryUsage = new Gauge({
-      name: 'websocket_memory_usage_bytes',
+      name: 'websocket_memory_usage_mb',
       help: 'Current memory usage during WebSocket operations',
       labelNames: ['event'],
     });
@@ -105,12 +105,10 @@ export class PrometheusMetricsService {
     });
 
     this.wsMemoryDelta = new Histogram({
-      name: 'websocket_memory_delta_bytes',
+      name: 'websocket_memory_delta_mb',
       help: 'Memory delta per WebSocket message',
       labelNames: ['event'],
-      buckets: [
-        -1048576, -524288, -262144, 0, 262144, 524288, 1048576, 2097152,
-      ],
+      buckets: [-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4, 8],
     });
 
     this.wsMessageDuration = new Histogram({
@@ -119,9 +117,6 @@ export class PrometheusMetricsService {
       labelNames: ['event'],
       buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
     });
-
-    // Start periodic memory collection
-    this.startMemoryCollection();
   }
 
   /**
@@ -154,7 +149,7 @@ export class PrometheusMetricsService {
     this.memoryUsageGauge.set({ type: 'array_buffers' }, memUsage.arrayBuffers);
 
     this.heapUsedGauge.set(memUsage.heapUsed);
-    Logger.log('', 'updateMemoryMetrics');
+    // Logger.log('', 'updateMemoryMetrics');
   }
 
   /**
@@ -170,15 +165,6 @@ export class PrometheusMetricsService {
   async getMetrics(): Promise<string> {
     this.updateMemoryMetrics();
     return register.metrics();
-  }
-
-  /**
-   * Start periodic memory collection
-   */
-  private startMemoryCollection() {
-    // setInterval(() => {
-    //   this.updateMemoryMetrics();
-    // }, 10000); // Every 10 seconds
   }
 
   /**
@@ -244,9 +230,15 @@ export class PrometheusMetricsService {
     this.wsMemoryUsage.set({ event }, memoryUsed);
   }
 
-  recordWebSocketMessage(event: string, memoryDelta: number, duration: number) {
+  recordWebSocketMessage(
+    event: string,
+    memoryDelta: number,
+    duration: number,
+    currentMemoryMB: number,
+  ): void {
     this.wsMessageCounter.inc({ event });
     this.wsMemoryDelta.observe({ event }, memoryDelta);
+    this.wsMemoryUsage.set({ event }, currentMemoryMB);
     this.wsMessageDuration.observe({ event }, duration);
     Logger.debug(`recording WS for event: ${event}`);
   }

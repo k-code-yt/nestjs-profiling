@@ -30,6 +30,10 @@ export class MemoryTrackingInterceptor implements NestInterceptor {
     (request as any).startMemory = startMemory;
     (request as any).startTime = startTime;
 
+    if (request.url.includes('sse') && !(request as any)?.id) {
+      (request as any).id = this.generateRandomString(16);
+    }
+
     return next.handle().pipe(
       tap(() => {
         const endTime = Date.now();
@@ -92,6 +96,18 @@ export class MemoryTrackingInterceptor implements NestInterceptor {
       .split('/')
       .slice(0, 4)
       .join('/');
+  }
+
+  private generateRandomString(length) {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(
+        Math.floor(Math.random() * characters.length),
+      );
+    }
+    return result;
   }
 }
 

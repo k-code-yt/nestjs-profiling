@@ -108,66 +108,10 @@
         }
       ],
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 }
-    },
-    {
-      "id": 6,
-      "title": "WebSocket Memory Usage",
-      "type": "timeseries",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "websocket_memory_usage_bytes",
-          "legendFormat": "{{event}}"
-        }
-      ],
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
-    },
-    {
-      "id": 7,
-      "title": "WebSocket Memory Delta Distribution",
-      "type": "timeseries",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(websocket_memory_delta_bytes_bucket[5m])) by (le, event))",
-          "legendFormat": "95th percentile {{event}}"
-        },
-        {
-          "expr": "histogram_quantile(0.50, sum(rate(websocket_memory_delta_bytes_bucket[5m])) by (le, event))",
-          "legendFormat": "50th percentile {{event}}"
-        }
-      ],
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
-    },
-    {
-      "id": 8,
-      "title": "WebSocket Connections",
-      "type": "stat",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "sum(websocket_connections_total{event=\"connect\"}) - sum(websocket_connections_total{event=\"disconnect\"})",
-          "legendFormat": "Active Connections"
-        }
-      ],
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 32 }
-    },
-    {
-      "id": 9,
-      "title": "WebSocket Message Rate",
-      "type": "stat",
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "sum(rate(websocket_messages_total[1m]))",
-          "legendFormat": "Messages/sec"
-        }
-      ],
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 32 }
     }
   ],
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "refresh": "10s"

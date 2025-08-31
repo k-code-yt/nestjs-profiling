@@ -8,12 +8,8 @@ import {
   WebSocketServer,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { BadRequestException, Logger, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { WSMemoryTrackingInterceptor } from './ws-tracking.interceptor';
-import { WSConnectionTracker } from './ws-connection-tracker';
-import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
-import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 
 interface RoomInfo {
   roomId: string;
@@ -22,30 +18,18 @@ interface RoomInfo {
   lastActivity: Date;
 }
 
-@UseInterceptors(WSMemoryTrackingInterceptor)
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
-  namespace: 'performance',
+  namespace: 'users',
 })
-export class WebsocketGateway
+export class ChatWebsocketGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   private logger: Logger = new Logger('WebsocketGateway');
-  private connectionTracker: WSConnectionTracker;
   private rooms: Map<string, RoomInfo> = new Map();
   @WebSocketServer() server: Server;
-
-  constructor(
-    private readonly memoryProfilingService: MemoryProfilingService,
-    private readonly prometheusMetricsService: PrometheusMetricsService,
-  ) {
-    this.connectionTracker = new WSConnectionTracker(
-      this.memoryProfilingService,
-      this.prometheusMetricsService,
-    );
-  }
 
   afterInit(server: Server) {
     this.logger.log('WebSocket Gateway initialized');
@@ -53,14 +37,24 @@ export class WebsocketGateway
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
-    this.connectionTracker.trackConnection('connect', client);
   }
 
   handleDisconnect(client: Socket) {
-    this.connectionTracker.trackConnection('disconnect', client);
     client.removeAllListeners();
     client.disconnect(true);
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  @SubscribeMessage('broadcast')
+  handleBroadcast(
+    @MessageBody() data: any,
+    @ConnectedSocket() client: Socket,
+  ): void {
+    this.server.emit('broadcast', {
+      message: `Broadcast to all: ${data?.message || ''}`,
+      timestamp: new Date().toISOString(),
+      fromClient: client.id,
+    });
   }
 
   @SubscribeMessage('message')
@@ -86,18 +80,6 @@ export class WebsocketGateway
     });
 
     return 'Message received';
-  }
-
-  @SubscribeMessage('broadcast')
-  handleBroadcast(
-    @MessageBody() data: any,
-    @ConnectedSocket() client: Socket,
-  ): void {
-    this.server.emit('broadcast', {
-      message: `Broadcast to all: ${data?.message || ''}`,
-      timestamp: new Date().toISOString(),
-      fromClient: client.id,
-    });
   }
 
   @SubscribeMessage('joinRoom')
@@ -148,7 +130,7 @@ export class WebsocketGateway
     const { roomId, message } = data;
 
     const room = this.rooms.get(roomId);
-    if (!room?.clients.has(client.id)) {
+    if (!room?.clients.has(client.id) || !client.rooms.has(roomId)) {
       this.server
         .to(client.id)
         .emit('roomMessage', { error: 'You are not in this room' });
@@ -210,9 +192,12 @@ export class WebsocketGateway
   }
 
   private leaveRoom(client: Socket, roomId: string): void {
-    client.leave(roomId);
+    if (client.rooms.has(roomId)) {
+      client.leave(roomId);
+    }
 
     const room = this.rooms.get(roomId);
+
     if (room) {
       room.clients.delete(client.id);
 

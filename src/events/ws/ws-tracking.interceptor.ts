@@ -11,12 +11,10 @@ import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 
 // TODOs
-// 1.add tracking for WS conn
-// check why WS mem not working
+// cancel SSE intervals
+// cancel WS intervals
 
-// 2.add load-testing for each
-
-// 3.add k8s && nginx w/ HTTP2
+// add k8s && nginx w/ HTTP2
 // add scalling up/down and test re-connections
 @Injectable()
 export class WSMemoryTrackingInterceptor implements NestInterceptor {
@@ -41,17 +39,17 @@ export class WSMemoryTrackingInterceptor implements NestInterceptor {
         const endTime = Date.now();
         const endMemory = this.memoryProfilingService.getMemoryUsage();
         const duration = (endTime - startTime) / 1000;
-        const memoryDelta = endMemory.heapUsed - startMemory.heapUsed;
+        const memoryDeltaBytes = endMemory.heapUsed - startMemory.heapUsed;
+        const memoryDeltaMB = memoryDeltaBytes / 1024 / 1024;
+        const currentMemoryMB = endMemory.heapUsed / 1024 / 1024;
 
         const eventName = handler.name || 'unknown';
 
-        this.logger.debug(`WS end mem delta: ${memoryDelta / 1024 / 1024}`);
-
-        if (Math.abs(memoryDelta) > 1048576 || duration > 1) {
+        if (Math.abs(memoryDeltaMB) > 200 || duration > 1) {
           this.logger.warn(`WS ${eventName} memory usage:`, {
             event: eventName,
             duration,
-            memoryDelta: Math.round(memoryDelta / 1024) + 'KB',
+            memoryDeltaMB: Math.round(memoryDeltaMB) + 'MB',
             clientId: client?.id || 'unknown',
             dataSize: JSON.stringify(data || {}).length,
           });
@@ -59,8 +57,9 @@ export class WSMemoryTrackingInterceptor implements NestInterceptor {
 
         this.prometheusMetricsService.recordWebSocketMessage(
           eventName,
-          memoryDelta,
+          memoryDeltaMB,
           duration,
+          currentMemoryMB,
         );
       }),
     );
