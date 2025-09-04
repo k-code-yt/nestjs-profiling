@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'nestjs-app'
+        static_configs:
+          - targets: ['nestjs-app:3000']
+        scrape_interval: 5s
+        metrics_path: '/metrics'
+
+      - job_name: 'nestjs-profiling'
+        static_configs:
+          - targets: ['nestjs-app:3000']
+        scrape_interval: 10s
+        metrics_path: '/profiling/metrics'
+
+    rule_files:
+      # - "first_rules.yml"
+      # - "second_rules.yml"
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              # - alertmanager:9093
