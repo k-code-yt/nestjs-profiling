@@ -4,13 +4,21 @@ metadata:
   name: monitoring-ingress
   namespace: monitoring
   annotations:
-    # Enable WebSocket and SSE support
+    # HTTP2
+    nginx.ingress.kubernetes.io/http2-push-preload: 'true'
+    nginx.ingress.kubernetes.io/backend-protocol: 'HTTP'
+    # nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
+
     nginx.ingress.kubernetes.io/proxy-read-timeout: '86400'
     nginx.ingress.kubernetes.io/proxy-send-timeout: '86400'
     nginx.ingress.kubernetes.io/proxy-buffering: 'off'
-    # No rewrite - pass the full path to the services
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - monitoring.local
+      secretName: monitoring-tls
   rules:
     - host: monitoring.local
       http:

@@ -1,15 +1,31 @@
 import { EventSource } from 'eventsource';
+import { fetch, Agent } from 'undici';
 
-// SSE Connection Simulator
+const httpAgent = new Agent({
+  keepAliveTimeout: 60000,
+  keepAliveMaxTimeout: 60000,
+  headersTimeout: 0,
+  bodyTimeout: 0,
+});
+
+const customFetch = (url: string, options: any = {}) => {
+  return fetch(url, {
+    ...options,
+    agent: httpAgent,
+  });
+};
+
 async function simulateSSEConnections(config?: {
   url: string;
   connectionCount: number;
   durationSeconds: number;
 }) {
+  const errList: string[] = [];
+
   const {
-    url = 'http://localhost:3000/sse/time',
-    connectionCount = 1000,
-    durationSeconds = 60,
+    url = 'https://monitoring.local/sse/time1',
+    connectionCount = 5,
+    durationSeconds = 15,
   } = config || {};
 
   const stats = {
@@ -23,7 +39,10 @@ async function simulateSSEConnections(config?: {
 
   // Create all connections
   for (let i = 0; i < connectionCount; i++) {
-    const es = new EventSource(url);
+    const es = new EventSource(url, {
+      fetch: customFetch,
+      withCredentials: false,
+    });
 
     es.onopen = () => {
       stats.connectionsEstablished++;
@@ -38,7 +57,8 @@ async function simulateSSEConnections(config?: {
       stats.messagesReceived++;
     };
 
-    es.onerror = () => {
+    es.onerror = (err) => {
+      errList.push(JSON.stringify(err));
       stats.errors++;
     };
 
@@ -70,6 +90,7 @@ async function simulateSSEConnections(config?: {
     errors: stats.errors,
     testDuration: totalTime,
     memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024,
+    errList,
   };
 }
 

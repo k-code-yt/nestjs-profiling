@@ -1,6 +1,5 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { MemoryProfilingService } from './profiling/mem-profiling.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -39,6 +38,6 @@ async function bootstrap() {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3435);
 }
 bootstrap();

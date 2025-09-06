@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP Connection Limit Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .status {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 4px;
+      }
+      .connected {
+        background: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .pending {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .start {
+        background: #28a745;
+        color: white;
+        border: none;
+      }
+      .stop {
+        background: #dc3545;
+        color: white;
+        border: none;
+      }
+      .test {
+        background: #007bff;
+        color: white;
+        border: none;
+      }
+      .single {
+        background: #17a2b8;
+        color: white;
+        border: none;
+      }
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+      }
+      .log {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 10px;
+        margin: 10px 0;
+        height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin: 20px 0;
+      }
+      .stat-card {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 5px;
+      }
+      .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+      }
+      .controls-group {
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+      .controls-group h4 {
+        margin-top: 0;
+        color: #495057;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>HTTP Connection Limit Test</h1>
+    <p>
+      This test demonstrates HTTP/1.1 connection limits by opening SSE
+      connections and then attempting regular HTTP requests.
+    </p>
+
+    <div class="controls-group">
+      <h4>Bulk Connection Controls</h4>
+      <button class="start" onclick="startSSEConnections()">
+        Start 6 SSE Connections
+      </button>
+      <button class="stop" onclick="stopAllConnections()">
+        Stop All Connections
+      </button>
+    </div>
+
+    <div class="controls-group">
+      <h4>Individual Connection Controls</h4>
+      <button class="single" id="connectOneBtn" onclick="connectRandomSSE()">
+        Connect 1 Random SSE
+      </button>
+      <button
+        class="single"
+        id="disconnectOneBtn"
+        onclick="disconnectRandomSSE()"
+        disabled
+      >
+        Disconnect 1 Random SSE
+      </button>
+    </div>
+
+    <div class="controls-group">
+      <h4>HTTP Request Tests</h4>
+      <button class="test" onclick="makeHttpRequest()">
+        Test HTTP Request
+      </button>
+      <button class="test" onclick="makeMultipleRequests()">
+        Test 3 HTTP Requests
+      </button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div>Active SSE Connections</div>
+        <div class="stat-number" id="activeConnections">0</div>
+      </div>
+      <div class="stat-card">
+        <div>Available Endpoints</div>
+        <div class="stat-number" id="availableEndpoints">6</div>
+      </div>
+      <div class="stat-card">
+        <div>Total Messages Received</div>
+        <div class="stat-number" id="messagesReceived">0</div>
+      </div>
+      <div class="stat-card">
+        <div>HTTP Requests Completed</div>
+        <div class="stat-number" id="httpCompleted">0</div>
+      </div>
+      <div class="stat-card">
+        <div>HTTP Requests Failed</div>
+        <div class="stat-number" id="httpFailed">0</div>
+      </div>
+    </div>
+
+    <h3>Connection Status</h3>
+    <div id="connectionStatus"></div>
+
+    <h3>Activity Log</h3>
+    <div class="log" id="activityLog"></div>
+
+    <script>
+      const BASE_URL = 'https://monitoring.local';
+      const SSE_ENDPOINTS = [
+        '/sse/time1',
+        '/sse/time2',
+        '/sse/time3',
+        '/sse/time4',
+        '/sse/time5',
+        '/sse/time6',
+      ];
+
+      let eventSources = [];
+      let availableEndpoints = [...SSE_ENDPOINTS]; // Track available endpoints
+      let stats = {
+        activeConnections: 0,
+        messagesReceived: 0,
+        httpCompleted: 0,
+        httpFailed: 0,
+      };
+
+      function log(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logDiv = document.getElementById('activityLog');
+        const entry = document.createElement('div');
+        entry.textContent = `[${timestamp}] ${message}`;
+        entry.className = type;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function updateStats() {
+        document.getElementById('activeConnections').textContent =
+          stats.activeConnections;
+        document.getElementById('availableEndpoints').textContent =
+          availableEndpoints.length;
+        document.getElementById('messagesReceived').textContent =
+          stats.messagesReceived;
+        document.getElementById('httpCompleted').textContent =
+          stats.httpCompleted;
+        document.getElementById('httpFailed').textContent = stats.httpFailed;
+      }
+
+      function updateButtons() {
+        const connectBtn = document.getElementById('connectOneBtn');
+        const disconnectBtn = document.getElementById('disconnectOneBtn');
+
+        connectBtn.disabled = availableEndpoints.length === 0;
+        disconnectBtn.disabled = stats.activeConnections === 0;
+      }
+
+      function updateConnectionStatus() {
+        const statusDiv = document.getElementById('connectionStatus');
+        statusDiv.innerHTML = '';
+
+        SSE_ENDPOINTS.forEach((endpoint, index) => {
+          const statusEl = document.createElement('div');
+          statusEl.className = 'status';
+
+          if (
+            eventSources[index] &&
+            eventSources[index].readyState === EventSource.OPEN
+          ) {
+            statusEl.className += ' connected';
+            statusEl.textContent = `Connection ${index + 1} (${endpoint}): CONNECTED`;
+          } else if (
+            eventSources[index] &&
+            eventSources[index].readyState === EventSource.CONNECTING
+          ) {
+            statusEl.className += ' pending';
+            statusEl.textContent = `Connection ${index + 1} (${endpoint}): CONNECTING...`;
+          } else if (
+            eventSources[index] &&
+            eventSources[index].readyState === EventSource.CLOSED
+          ) {
+            statusEl.className += ' error';
+            statusEl.textContent = `Connection ${index + 1} (${endpoint}): CLOSED`;
+          } else {
+            statusEl.className += ' info';
+            statusEl.textContent = `Connection ${index + 1} (${endpoint}): NOT STARTED`;
+          }
+
+          statusDiv.appendChild(statusEl);
+        });
+      }
+
+      function connectRandomSSE() {
+        if (availableEndpoints.length === 0) {
+          log('No available endpoints to connect to', 'error');
+          return;
+        }
+
+        // Pick a random endpoint from available ones
+        const randomIndex = Math.floor(
+          Math.random() * availableEndpoints.length,
+        );
+        const selectedEndpoint = availableEndpoints[randomIndex];
+        const endpointIndex = SSE_ENDPOINTS.indexOf(selectedEndpoint);
+
+        log(`Connecting to random endpoint: ${selectedEndpoint}`, 'info');
+
+        const url = BASE_URL + selectedEndpoint;
+        const es = new EventSource(url);
+
+        es.onopen = function () {
+          stats.activeConnections++;
+          // Remove from available endpoints
+          availableEndpoints.splice(randomIndex, 1);
+          log(
+            `SSE Connection ${endpointIndex + 1} opened successfully`,
+            'connected',
+          );
+          updateStats();
+          updateButtons();
+          updateConnectionStatus();
+        };
+
+        es.onmessage = function (event) {
+          stats.messagesReceived++;
+          log(
+            `Message from connection ${endpointIndex + 1}: ${event.data.substring(0, 50)}...`,
+            'info',
+          );
+          updateStats();
+        };
+
+        es.onerror = function (error) {
+          log(
+            `SSE Connection ${endpointIndex + 1} error: ${error.type || 'Connection failed'}`,
+            'error',
+          );
+          if (es.readyState === EventSource.CLOSED) {
+            stats.activeConnections--;
+            // Add back to available endpoints if it failed
+            if (!availableEndpoints.includes(selectedEndpoint)) {
+              availableEndpoints.push(selectedEndpoint);
+            }
+            updateStats();
+            updateButtons();
+          }
+          updateConnectionStatus();
+        };
+
+        eventSources[endpointIndex] = es;
+        updateConnectionStatus();
+      }
+
+      function disconnectRandomSSE() {
+        // Find all active connections
+        const activeConnections = [];
+        eventSources.forEach((es, index) => {
+          if (es && es.readyState === EventSource.OPEN) {
+            activeConnections.push(index);
+          }
+        });
+
+        if (activeConnections.length === 0) {
+          log('No active connections to disconnect', 'error');
+          return;
+        }
+
+        // Pick a random active connection
+        const randomIndex = Math.floor(
+          Math.random() * activeConnections.length,
+        );
+        const connectionIndex = activeConnections[randomIndex];
+        const endpoint = SSE_ENDPOINTS[connectionIndex];
+
+        log(`Disconnecting random connection: ${endpoint}`, 'info');
+
+        if (eventSources[connectionIndex]) {
+          eventSources[connectionIndex].close();
+          eventSources[connectionIndex] = null;
+          stats.activeConnections--;
+
+          // Clear pod info for this connection
+          connectionPods.delete(connectionIndex);
+
+          // Add back to available endpoints
+          if (!availableEndpoints.includes(endpoint)) {
+            availableEndpoints.push(endpoint);
+          }
+
+          log(`Connection ${connectionIndex + 1} closed`, 'info');
+          updateStats();
+          updateButtons();
+          updateConnectionStatus();
+        }
+      }
+
+      function startSSEConnections() {
+        log('Starting 6 SSE connections...', 'info');
+
+        SSE_ENDPOINTS.forEach((endpoint, index) => {
+          const url = BASE_URL + endpoint;
+          log(`Connecting to ${url}`, 'info');
+
+          const es = new EventSource(url);
+
+          es.onopen = function () {
+            stats.activeConnections++;
+            // Remove from available endpoints
+            const endpointIndex = availableEndpoints.indexOf(endpoint);
+            if (endpointIndex > -1) {
+              availableEndpoints.splice(endpointIndex, 1);
+            }
+            log(`SSE Connection ${index + 1} opened successfully`, 'connected');
+            updateStats();
+            updateButtons();
+            updateConnectionStatus();
+          };
+
+          es.onmessage = function (event) {
+            stats.messagesReceived++;
+            log(
+              `Message from connection ${index + 1}: ${event.data.substring(0, 50)}...`,
+              'info',
+            );
+            updateStats();
+          };
+
+          es.onerror = function (error) {
+            log(
+              `SSE Connection ${index + 1} error: ${error.type || 'Connection failed'}`,
+              'error',
+            );
+            if (es.readyState === EventSource.CLOSED) {
+              stats.activeConnections--;
+              // Add back to available endpoints if it failed
+              if (!availableEndpoints.includes(endpoint)) {
+                availableEndpoints.push(endpoint);
+              }
+              updateStats();
+              updateButtons();
+            }
+            updateConnectionStatus();
+          };
+
+          eventSources[index] = es;
+        });
+
+        updateConnectionStatus();
+      }
+
+      function stopAllConnections() {
+        log('Stopping all SSE connections...', 'info');
+
+        eventSources.forEach((es, index) => {
+          if (es) {
+            es.close();
+            log(`Connection ${index + 1} closed`, 'info');
+          }
+        });
+
+        eventSources = [];
+        stats.activeConnections = 0;
+        availableEndpoints = [...SSE_ENDPOINTS]; // Reset available endpoints
+        updateStats();
+        updateButtons();
+        updateConnectionStatus();
+      }
+
+      async function makeHttpRequest() {
+        const startTime = Date.now();
+        log('Making HTTP request...', 'info');
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+            log('HTTP request timed out after 30 seconds', 'error');
+          }, 30000);
+
+          const response = await fetch(`${BASE_URL}/profiling/memory`, {
+            method: 'GET',
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const duration = Date.now() - startTime;
+
+          if (response.ok) {
+            stats.httpCompleted++;
+            log(
+              `HTTP request completed successfully in ${duration}ms (Status: ${response.status})`,
+              'connected',
+            );
+          } else {
+            stats.httpFailed++;
+            log(
+              `HTTP request failed with status: ${response.status} in ${duration}ms`,
+              'error',
+            );
+          }
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          stats.httpFailed++;
+
+          if (error.name === 'AbortError') {
+            log(
+              `HTTP request aborted after ${duration}ms (likely due to connection limit)`,
+              'error',
+            );
+          } else {
+            log(
+              `HTTP request error after ${duration}ms: ${error.message}`,
+              'error',
+            );
+          }
+        }
+
+        updateStats();
+      }
+
+      async function makeMultipleRequests() {
+        log('Making 3 concurrent HTTP requests...', 'info');
+
+        const promises = [];
+        for (let i = 0; i < 3; i++) {
+          promises.push(makeHttpRequestWithId(i + 1));
+        }
+
+        await Promise.allSettled(promises);
+        log('All concurrent requests completed', 'info');
+      }
+
+      async function makeHttpRequestWithId(requestId) {
+        const startTime = Date.now();
+        log(`HTTP Request ${requestId}: Starting...`, 'info');
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+            log(
+              `HTTP Request ${requestId}: Timed out after 30 seconds`,
+              'error',
+            );
+          }, 30000);
+
+          const response = await fetch(`${BASE_URL}/profiling/memory`, {
+            method: 'GET',
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const duration = Date.now() - startTime;
+
+          if (response.ok) {
+            stats.httpCompleted++;
+            log(
+              `HTTP Request ${requestId}: Completed in ${duration}ms (Status: ${response.status})`,
+              'connected',
+            );
+          } else {
+            stats.httpFailed++;
+            log(
+              `HTTP Request ${requestId}: Failed with status ${response.status} in ${duration}ms`,
+              'error',
+            );
+          }
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          stats.httpFailed++;
+
+          if (error.name === 'AbortError') {
+            log(
+              `HTTP Request ${requestId}: Aborted after ${duration}ms (likely due to connection limit)`,
+              'error',
+            );
+          } else {
+            log(
+              `HTTP Request ${requestId}: Error after ${duration}ms: ${error.message}`,
+              'error',
+            );
+          }
+        }
+
+        updateStats();
+      }
+
+      // Initialize
+      updateConnectionStatus();
+      updateStats();
+      updateButtons();
+
+      // Log initial info
+      log('HTTP Connection Limit Test loaded', 'info');
+      log(
+        'Use individual controls to test connection limits incrementally',
+        'info',
+      );
+      log('Or use bulk controls to start/stop all connections at once', 'info');
+    </script>
+  </body>
+</html>

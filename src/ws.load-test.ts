@@ -7,10 +7,10 @@ async function simulateWebSocketConnections(config?: {
   durationSeconds: number;
 }) {
   const {
-    url = 'http://localhost:3000',
-    connectionCount = 1000,
-    messagesPerMinute = 60,
-    durationSeconds = 60,
+    url = 'wss://monitoring.local',
+    connectionCount = 100,
+    messagesPerMinute = 10,
+    durationSeconds = 120,
   } = config || {};
 
   const stats = {

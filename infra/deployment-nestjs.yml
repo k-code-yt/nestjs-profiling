@@ -25,6 +25,14 @@ spec:
               value: 'development'
             - name: NODE_OPTIONS
               value: '--max-old-space-size=1000 --expose-gc'
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           resources:
             limits:
               memory: '1024Mi'
