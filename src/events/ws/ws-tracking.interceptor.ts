@@ -11,11 +11,12 @@ import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 
 // TODOs
-// cancel SSE intervals
-// cancel WS intervals
-
-// add k8s && nginx w/ HTTP2
-// add scalling up/down and test re-connections
+// - Test conditions same for each
+// - Start collecting performance metrics
+//     - how to download/where to store
+//     - sse via http2 vs ws
+// - How to enable and disable http2
+//     - Save secrets into file
 @Injectable()
 export class WSMemoryTrackingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('WSMemoryTracker');

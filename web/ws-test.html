@@ -449,16 +449,16 @@
         );
         if (data.podName && data.podIp && podInfoEl) {
           podInfoEl.innerHTML = `
-                    <div class="pod-detail">
-                        <strong>Pod:</strong> <span>${data.podName}</span>
-                    </div>
-                    <div class="pod-detail">
-                        <strong>IP:</strong> <span>${data.podIp}</span>
-                    </div>
-                    <div class="pod-detail">
-                        <strong>Socket:</strong> <span>${connections.get(connectionId).socket.id}</span>
-                    </div>
-                `;
+                       <div class="pod-detail">
+                           <strong>Pod:</strong> <span>${data.podName}</span>
+                       </div>
+                       <div class="pod-detail">
+                           <strong>IP:</strong> <span>${data.podIp}</span>
+                       </div>
+                       <div class="pod-detail">
+                           <strong>Socket:</strong> <span>${connections.get(connectionId).socket.id}</span>
+                       </div>
+                   `;
           podInfoEl.style.display = 'block';
 
           connectedPods.add(data.podName);
@@ -476,26 +476,26 @@
         connectionCard.id = `conn-${connectionId}`;
 
         connectionCard.innerHTML = `
-                <div class="connection-header">
-                    <div class="connection-id">Connection #${connectionId}</div>
-                    <div class="status disconnected">DISCONNECTED</div>
-                </div>
-                
-                <div class="connection-controls">
-                    <button class="connect-btn">Connect</button>
-                    <button class="disconnect-btn" disabled>Disconnect</button>
-                    <button class="send-btn" disabled>Send</button>
-                    <button class="remove-btn">Remove</button>
-                </div>
-                
-                <div class="pod-info" style="display: none;"></div>
-                
-                <div class="messages">
-                    <div class="message">
-                        <span class="timestamp">[Ready]</span> Connection ${connectionId} ready to connect to ${url}
-                    </div>
-                </div>
-            `;
+                   <div class="connection-header">
+                       <div class="connection-id">Connection #${connectionId}</div>
+                       <div class="status disconnected">DISCONNECTED</div>
+                   </div>
+
+                   <div class="connection-controls">
+                       <button class="connect-btn">Connect</button>
+                       <button class="disconnect-btn" disabled>Disconnect</button>
+                       <button class="send-btn" disabled>Send</button>
+                       <button class="remove-btn">Remove</button>
+                   </div>
+
+                   <div class="pod-info" style="display: none;"></div>
+
+                   <div class="messages">
+                       <div class="message">
+                           <span class="timestamp">[Ready]</span> Connection ${connectionId} ready to connect to ${url}
+                       </div>
+                   </div>
+               `;
 
         connectionsContainer.appendChild(connectionCard);
 
@@ -562,9 +562,8 @@
             card.querySelector('.disconnect-btn').disabled = false;
             card.querySelector('.send-btn').disabled = false;
 
-            // Send initial message to get pod info
             socket.emit('message', {
-              message: `Hello from Connection #${connectionId}`,
+              message: `ConnectionID #${connectionId}, time: ${new Date().toISOString()}`,
             });
           });
 

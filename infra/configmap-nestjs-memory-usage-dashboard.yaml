@@ -116,6 +116,89 @@ data:
           ],
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
         },
+        
+        {
+          "id": 9,
+          "title": "SSE Connections",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(sse_connections_total{event=\"connect\"}) - sum(sse_connections_total{event=\"disconnect\"})",
+              "legendFormat": "Active Connections"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 800 },
+                  { "color": "red", "value": 1800 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 4, "x": 12, "y": 16 }
+        },
+        {
+          "id": 10,
+          "title": "WebSocket Connections",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(websocket_connections_total{event=\"connect\"}) - sum(websocket_connections_total{event=\"disconnect\"})",
+              "legendFormat": "Active Connections"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 800 },
+                  { "color": "red", "value": 1800 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 4, "x": 16, "y": 16 }
+        },
+        {
+          "id": 11,
+          "title": "WebSocket Message Rate",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(rate(websocket_messages_total[1m]))",
+              "legendFormat": "Messages/sec"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 80 },
+                  { "color": "red", "value": 100 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 4, "x": 20, "y": 16 }
+        },
         {
           "id": 7,
           "title": "WebSocket Memory Usage",
@@ -136,7 +219,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
         },
         {
-          "id": 8,
+          "id": 11,
           "title": "WebSocket Memory Delta Distribution",
           "type": "timeseries",
           "datasource": "Prometheus",
@@ -167,62 +250,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
         },
         {
-          "id": 9,
-          "title": "WebSocket Connections",
-          "type": "stat",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "sum(websocket_connections_total{event=\"connect\"}) - sum(websocket_connections_total{event=\"disconnect\"})",
-              "legendFormat": "Active Connections"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 50 },
-                  { "color": "red", "value": 100 }
-                ]
-              }
-            }
-          },
-          "gridPos": { "h": 4, "w": 12, "x": 0, "y": 32 }
-        },
-        {
-          "id": 10,
-          "title": "WebSocket Message Rate",
-          "type": "stat",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "sum(rate(websocket_messages_total[1m]))",
-              "legendFormat": "Messages/sec"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps",
-              "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 10 },
-                  { "color": "red", "value": 50 }
-                ]
-              }
-            }
-          },
-          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 32 }
-        },
-        {
-          "id": 11,
+          "id": 12,
           "title": "Memory Usage (w/o cache)",
           "type": "timeseries",
           "datasource": "Prometheus",

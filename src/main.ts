@@ -38,6 +38,21 @@ async function bootstrap() {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   });
 
-  await app.listen(process.env.PORT ?? 3435);
+  await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
+
+// HIGH LOAD
+// connectionCount: 1000,
+//   messagesPerMinute: 60,
+//   durationSeconds: 120
+
+// Medium Load
+//   connectionCount: 500,
+//   messagesPerMinute: 30,
+//   durationSeconds: 300
+
+// Low Load
+// connectionCount: 100,
+//   messagesPerMinute: 10,
+//   durationSeconds: 600

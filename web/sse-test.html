@@ -15,6 +15,8 @@
         padding: 10px;
         margin: 5px 0;
         border-radius: 4px;
+        transition: all 0.3s ease;
+        position: relative;
       }
       .connected {
         background: #d4edda;
@@ -32,6 +34,56 @@
         background: #d1ecf1;
         color: #0c5460;
       }
+
+      /* Pod change animation */
+      .pod-change {
+        animation: podChangeAnimation 2s ease-in-out;
+        border: 2px solid #ffc107 !important;
+      }
+
+      @keyframes podChangeAnimation {
+        0% {
+          background: #fff3cd;
+          transform: scale(1);
+        }
+        25% {
+          background: #ffeaa7;
+          transform: scale(1.02);
+          box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+        }
+        50% {
+          background: #fdcb6e;
+          transform: scale(1.02);
+          box-shadow: 0 0 20px rgba(255, 193, 7, 0.7);
+        }
+        75% {
+          background: #ffeaa7;
+          transform: scale(1.01);
+          box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
+        }
+        100% {
+          transform: scale(1);
+          box-shadow: none;
+        }
+      }
+
+      .pod-info {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-top: 4px;
+        font-style: italic;
+      }
+
+      .pod-name {
+        font-weight: bold;
+        color: #007bff;
+      }
+
+      .pod-ip {
+        color: #6c757d;
+        margin-left: 10px;
+      }
+
       button {
         padding: 10px 20px;
         margin: 5px;
@@ -99,6 +151,27 @@
         margin-top: 0;
         color: #495057;
       }
+
+      /* New pod indicator */
+      .new-pod-indicator {
+        display: inline-block;
+        background: #28a745;
+        color: white;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: 8px;
+        animation: pulse 1s ease-in-out infinite alternate;
+      }
+
+      @keyframes pulse {
+        from {
+          opacity: 0.7;
+        }
+        to {
+          opacity: 1;
+        }
+      }
     </style>
   </head>
   <body>
@@ -164,6 +237,10 @@
         <div>HTTP Requests Failed</div>
         <div class="stat-number" id="httpFailed">0</div>
       </div>
+      <div class="stat-card">
+        <div>Unique Pods Connected</div>
+        <div class="stat-number" id="uniquePods">0</div>
+      </div>
     </div>
 
     <h3>Connection Status</h3>
@@ -184,13 +261,46 @@
       ];
 
       let eventSources = [];
-      let availableEndpoints = [...SSE_ENDPOINTS]; // Track available endpoints
+      let availableEndpoints = [...SSE_ENDPOINTS];
+      let connectionPods = new Map();
+      let allDiscoveredPods = new Set();
       let stats = {
         activeConnections: 0,
         messagesReceived: 0,
         httpCompleted: 0,
         httpFailed: 0,
       };
+
+      function checkPodChange(connectionIndex, newPodInfo) {
+        const currentPod = connectionPods.get(connectionIndex);
+        connectionPods.set(connectionIndex, newPodInfo);
+        allDiscoveredPods.add(newPodInfo.podName);
+        if (currentPod && currentPod.podName !== newPodInfo.podName) {
+          const statusDiv = document.getElementById('connectionStatus');
+          const connectionElements = statusDiv.children;
+          if (connectionElements[connectionIndex]) {
+            connectionElements[connectionIndex].classList.add('pod-change');
+            setTimeout(() => {
+              connectionElements[connectionIndex].classList.remove(
+                'pod-change',
+              );
+            }, 2000);
+          }
+
+          log(
+            `🔄 Connection ${connectionIndex + 1} switched from pod ${currentPod.podName} to ${newPodInfo.podName}`,
+            'pending',
+          );
+        } else if (!currentPod) {
+          // First connection to this endpoint
+          log(
+            `🔗 Connection ${connectionIndex + 1} established with pod ${newPodInfo.podName} (${newPodInfo.podIp})`,
+            'connected',
+          );
+        }
+
+        updateStats();
+      }
 
       function log(message, type = 'info') {
         const timestamp = new Date().toLocaleTimeString();
@@ -212,6 +322,8 @@
         document.getElementById('httpCompleted').textContent =
           stats.httpCompleted;
         document.getElementById('httpFailed').textContent = stats.httpFailed;
+        document.getElementById('uniquePods').textContent =
+          allDiscoveredPods.size;
       }
 
       function updateButtons() {
@@ -230,27 +342,48 @@
           const statusEl = document.createElement('div');
           statusEl.className = 'status';
 
+          const podInfo = connectionPods.get(index);
+          let podInfoHtml = '';
+
+          if (podInfo) {
+            podInfoHtml = `
+              <div class="pod-info">
+                <span class="pod-name">Pod: ${podInfo.podName}</span>
+                <span class="pod-ip">IP: ${podInfo.podIp}</span>
+              </div>
+            `;
+          }
+
           if (
             eventSources[index] &&
             eventSources[index].readyState === EventSource.OPEN
           ) {
             statusEl.className += ' connected';
-            statusEl.textContent = `Connection ${index + 1} (${endpoint}): CONNECTED`;
+            statusEl.innerHTML = `
+              Connection ${index + 1} (${endpoint}): CONNECTED
+              ${podInfoHtml}
+            `;
           } else if (
             eventSources[index] &&
             eventSources[index].readyState === EventSource.CONNECTING
           ) {
             statusEl.className += ' pending';
-            statusEl.textContent = `Connection ${index + 1} (${endpoint}): CONNECTING...`;
+            statusEl.innerHTML = `
+              Connection ${index + 1} (${endpoint}): CONNECTING...
+              ${podInfoHtml}
+            `;
           } else if (
             eventSources[index] &&
             eventSources[index].readyState === EventSource.CLOSED
           ) {
             statusEl.className += ' error';
-            statusEl.textContent = `Connection ${index + 1} (${endpoint}): CLOSED`;
+            statusEl.innerHTML = `
+              Connection ${index + 1} (${endpoint}): CLOSED
+              ${podInfoHtml}
+            `;
           } else {
             statusEl.className += ' info';
-            statusEl.textContent = `Connection ${index + 1} (${endpoint}): NOT STARTED`;
+            statusEl.innerHTML = `Connection ${index + 1} (${endpoint}): NOT STARTED`;
           }
 
           statusDiv.appendChild(statusEl);
@@ -259,28 +392,26 @@
 
       function connectRandomSSE() {
         if (availableEndpoints.length === 0) {
-          log('No available endpoints to connect to', 'error');
+          log('❌ No available endpoints to connect to', 'error');
           return;
         }
 
-        // Pick a random endpoint from available ones
         const randomIndex = Math.floor(
           Math.random() * availableEndpoints.length,
         );
         const selectedEndpoint = availableEndpoints[randomIndex];
         const endpointIndex = SSE_ENDPOINTS.indexOf(selectedEndpoint);
 
-        log(`Connecting to random endpoint: ${selectedEndpoint}`, 'info');
+        log(`🔌 Connecting to random endpoint: ${selectedEndpoint}`, 'info');
 
         const url = BASE_URL + selectedEndpoint;
         const es = new EventSource(url);
 
         es.onopen = function () {
           stats.activeConnections++;
-          // Remove from available endpoints
           availableEndpoints.splice(randomIndex, 1);
           log(
-            `SSE Connection ${endpointIndex + 1} opened successfully`,
+            `✅ SSE Connection ${endpointIndex + 1} opened successfully`,
             'connected',
           );
           updateStats();
@@ -288,23 +419,41 @@
           updateConnectionStatus();
         };
 
-        es.onmessage = function (event) {
+        es.addEventListener('time-update', (event) => {
           stats.messagesReceived++;
-          log(
-            `Message from connection ${endpointIndex + 1}: ${event.data.substring(0, 50)}...`,
-            'info',
-          );
+
+          try {
+            const data = JSON.parse(event.data);
+            if (data.podName && data.podIp) {
+              checkPodChange(endpointIndex, {
+                podName: data.podName,
+                podIp: data.podIp,
+              });
+            }
+
+            log(
+              `📨 Message from connection ${endpointIndex + 1} (${data.podName || 'unknown pod'})`,
+              'info',
+            );
+          } catch (e) {
+            log(
+              `📨 Message from connection ${endpointIndex + 1}: ${event.data.substring(0, 50)}...`,
+              'info',
+            );
+          }
+
           updateStats();
-        };
+          updateConnectionStatus();
+        });
 
         es.onerror = function (error) {
           log(
-            `SSE Connection ${endpointIndex + 1} error: ${error.type || 'Connection failed'}`,
+            `❌ SSE Connection ${endpointIndex + 1} error: ${error.type || 'Connection failed'}`,
             'error',
           );
+
           if (es.readyState === EventSource.CLOSED) {
             stats.activeConnections--;
-            // Add back to available endpoints if it failed
             if (!availableEndpoints.includes(selectedEndpoint)) {
               availableEndpoints.push(selectedEndpoint);
             }
@@ -319,7 +468,6 @@
       }
 
       function disconnectRandomSSE() {
-        // Find all active connections
         const activeConnections = [];
         eventSources.forEach((es, index) => {
           if (es && es.readyState === EventSource.OPEN) {
@@ -328,33 +476,34 @@
         });
 
         if (activeConnections.length === 0) {
-          log('No active connections to disconnect', 'error');
+          log('❌ No active connections to disconnect', 'error');
           return;
         }
 
-        // Pick a random active connection
         const randomIndex = Math.floor(
           Math.random() * activeConnections.length,
         );
         const connectionIndex = activeConnections[randomIndex];
         const endpoint = SSE_ENDPOINTS[connectionIndex];
+        const podInfo = connectionPods.get(connectionIndex);
 
-        log(`Disconnecting random connection: ${endpoint}`, 'info');
+        log(
+          `🔌 Disconnecting random connection: ${endpoint} (Pod: ${podInfo?.podName || 'unknown'})`,
+          'info',
+        );
 
         if (eventSources[connectionIndex]) {
           eventSources[connectionIndex].close();
           eventSources[connectionIndex] = null;
           stats.activeConnections--;
 
-          // Clear pod info for this connection
           connectionPods.delete(connectionIndex);
 
-          // Add back to available endpoints
           if (!availableEndpoints.includes(endpoint)) {
             availableEndpoints.push(endpoint);
           }
 
-          log(`Connection ${connectionIndex + 1} closed`, 'info');
+          log(`❌ Connection ${connectionIndex + 1} closed`, 'info');
           updateStats();
           updateButtons();
           updateConnectionStatus();
@@ -362,22 +511,24 @@
       }
 
       function startSSEConnections() {
-        log('Starting 6 SSE connections...', 'info');
+        log('🚀 Starting 6 SSE connections...', 'info');
 
         SSE_ENDPOINTS.forEach((endpoint, index) => {
           const url = BASE_URL + endpoint;
-          log(`Connecting to ${url}`, 'info');
+          log(`🔌 Connecting to ${url}`, 'info');
 
           const es = new EventSource(url);
 
           es.onopen = function () {
             stats.activeConnections++;
-            // Remove from available endpoints
             const endpointIndex = availableEndpoints.indexOf(endpoint);
             if (endpointIndex > -1) {
               availableEndpoints.splice(endpointIndex, 1);
             }
-            log(`SSE Connection ${index + 1} opened successfully`, 'connected');
+            log(
+              `✅ SSE Connection ${index + 1} opened successfully`,
+              'connected',
+            );
             updateStats();
             updateButtons();
             updateConnectionStatus();
@@ -385,21 +536,40 @@
 
           es.onmessage = function (event) {
             stats.messagesReceived++;
-            log(
-              `Message from connection ${index + 1}: ${event.data.substring(0, 50)}...`,
-              'info',
-            );
+
+            try {
+              const data = JSON.parse(event.data);
+              if (data.podName && data.podIp) {
+                checkPodChange(index, {
+                  podName: data.podName,
+                  podIp: data.podIp,
+                });
+              }
+
+              log(
+                `📨 Message from connection ${index + 1} (${data.podName || 'unknown pod'})`,
+                'info',
+              );
+            } catch (e) {
+              log(
+                `📨 Message from connection ${index + 1}: ${event.data.substring(0, 50)}...`,
+                'info',
+              );
+            }
+
             updateStats();
+            updateConnectionStatus();
           };
 
           es.onerror = function (error) {
             log(
-              `SSE Connection ${index + 1} error: ${error.type || 'Connection failed'}`,
+              `❌ SSE Connection ${index + 1} error: ${error.type || 'Connection failed'}`,
               'error',
             );
+
             if (es.readyState === EventSource.CLOSED) {
               stats.activeConnections--;
-              // Add back to available endpoints if it failed
+              connectionPods.delete(index);
               if (!availableEndpoints.includes(endpoint)) {
                 availableEndpoints.push(endpoint);
               }
@@ -416,18 +586,19 @@
       }
 
       function stopAllConnections() {
-        log('Stopping all SSE connections...', 'info');
+        log('🛑 Stopping all SSE connections...', 'info');
 
         eventSources.forEach((es, index) => {
           if (es) {
             es.close();
-            log(`Connection ${index + 1} closed`, 'info');
+            log(`❌ Connection ${index + 1} closed`, 'info');
           }
         });
 
         eventSources = [];
+        connectionPods.clear();
         stats.activeConnections = 0;
-        availableEndpoints = [...SSE_ENDPOINTS]; // Reset available endpoints
+        availableEndpoints = [...SSE_ENDPOINTS];
         updateStats();
         updateButtons();
         updateConnectionStatus();
@@ -435,13 +606,13 @@
 
       async function makeHttpRequest() {
         const startTime = Date.now();
-        log('Making HTTP request...', 'info');
+        log('🌐 Making HTTP request...', 'info');
 
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => {
             controller.abort();
-            log('HTTP request timed out after 30 seconds', 'error');
+            log('⏰ HTTP request timed out after 30 seconds', 'error');
           }, 30000);
 
           const response = await fetch(`${BASE_URL}/profiling/memory`, {
@@ -455,13 +626,13 @@
           if (response.ok) {
             stats.httpCompleted++;
             log(
-              `HTTP request completed successfully in ${duration}ms (Status: ${response.status})`,
+              `✅ HTTP request completed successfully in ${duration}ms (Status: ${response.status})`,
               'connected',
             );
           } else {
             stats.httpFailed++;
             log(
-              `HTTP request failed with status: ${response.status} in ${duration}ms`,
+              `❌ HTTP request failed with status: ${response.status} in ${duration}ms`,
               'error',
             );
           }
@@ -471,12 +642,12 @@
 
           if (error.name === 'AbortError') {
             log(
-              `HTTP request aborted after ${duration}ms (likely due to connection limit)`,
+              `⚠️ HTTP request aborted after ${duration}ms (likely due to connection limit)`,
               'error',
             );
           } else {
             log(
-              `HTTP request error after ${duration}ms: ${error.message}`,
+              `❌ HTTP request error after ${duration}ms: ${error.message}`,
               'error',
             );
           }
@@ -486,7 +657,7 @@
       }
 
       async function makeMultipleRequests() {
-        log('Making 3 concurrent HTTP requests...', 'info');
+        log('🌐 Making 3 concurrent HTTP requests...', 'info');
 
         const promises = [];
         for (let i = 0; i < 3; i++) {
@@ -494,19 +665,19 @@
         }
 
         await Promise.allSettled(promises);
-        log('All concurrent requests completed', 'info');
+        log('✅ All concurrent requests completed', 'info');
       }
 
       async function makeHttpRequestWithId(requestId) {
         const startTime = Date.now();
-        log(`HTTP Request ${requestId}: Starting...`, 'info');
+        log(`🌐 HTTP Request ${requestId}: Starting...`, 'info');
 
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => {
             controller.abort();
             log(
-              `HTTP Request ${requestId}: Timed out after 30 seconds`,
+              `⏰ HTTP Request ${requestId}: Timed out after 30 seconds`,
               'error',
             );
           }, 30000);
@@ -522,13 +693,13 @@
           if (response.ok) {
             stats.httpCompleted++;
             log(
-              `HTTP Request ${requestId}: Completed in ${duration}ms (Status: ${response.status})`,
+              `✅ HTTP Request ${requestId}: Completed in ${duration}ms (Status: ${response.status})`,
               'connected',
             );
           } else {
             stats.httpFailed++;
             log(
-              `HTTP Request ${requestId}: Failed with status ${response.status} in ${duration}ms`,
+              `❌ HTTP Request ${requestId}: Failed with status ${response.status} in ${duration}ms`,
               'error',
             );
           }
@@ -538,12 +709,12 @@
 
           if (error.name === 'AbortError') {
             log(
-              `HTTP Request ${requestId}: Aborted after ${duration}ms (likely due to connection limit)`,
+              `⚠️ HTTP Request ${requestId}: Aborted after ${duration}ms (likely due to connection limit)`,
               'error',
             );
           } else {
             log(
-              `HTTP Request ${requestId}: Error after ${duration}ms: ${error.message}`,
+              `❌ HTTP Request ${requestId}: Error after ${duration}ms: ${error.message}`,
               'error',
             );
           }
@@ -558,12 +729,15 @@
       updateButtons();
 
       // Log initial info
-      log('HTTP Connection Limit Test loaded', 'info');
+      log('🎯 HTTP Connection Limit Test loaded', 'info');
       log(
-        'Use individual controls to test connection limits incrementally',
+        '🔧 Use individual controls to test connection limits incrementally',
         'info',
       );
-      log('Or use bulk controls to start/stop all connections at once', 'info');
+      log(
+        '🚀 Or use bulk controls to start/stop all connections at once',
+        'info',
+      );
     </script>
   </body>
 </html>

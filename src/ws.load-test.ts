@@ -22,7 +22,6 @@ async function simulateWebSocketConnections(config?: {
 
   const connections = [];
 
-  // Create all connections
   for (let i = 0; i < connectionCount; i++) {
     const socket = io(url, {
       transports: ['websocket'],

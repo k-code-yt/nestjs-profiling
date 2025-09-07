@@ -2,13 +2,13 @@ import {
   Controller,
   Sse,
   MessageEvent,
-  Post,
-  Body,
   Logger,
   Req,
+  Query,
 } from '@nestjs/common';
 import { Observable, Subject, interval, map, takeUntil, tap } from 'rxjs';
 import { SseService } from './sse.service';
+import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 
 interface PodInfo {
   podName: string;
@@ -22,7 +22,10 @@ export class SseController {
   private podInfo: PodInfo;
   private isLogMessage: boolean = false;
 
-  constructor(private readonly sseService: SseService) {
+  constructor(
+    private readonly sseService: SseService,
+    private readonly metricsService: PrometheusMetricsService,
+  ) {
     this.podInfo = {
       podName: process.env.POD_NAME || process.env.HOSTNAME || 'localhost',
       podIp: process.env.POD_IP || 'unknown',
@@ -30,12 +33,15 @@ export class SseController {
   }
 
   @Sse('time1')
-  sendTime1(@Req() request: Request): Observable<MessageEvent> {
+  sendTime1(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+  ): Observable<MessageEvent> {
     const cleanup$ = new Subject<void>();
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(1000).pipe(
+    const int = interval(60000 / Number(msgs)).pipe(
       takeUntil(cleanup$),
       map(() => ({
         data: JSON.stringify({
@@ -55,12 +61,15 @@ export class SseController {
     return int;
   }
   @Sse('time2')
-  sendTime2(@Req() request: Request): Observable<MessageEvent> {
+  sendTime2(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+  ): Observable<MessageEvent> {
     const cleanup$ = new Subject<void>();
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(1000).pipe(
+    const int = interval(60000 / Number(msgs)).pipe(
       takeUntil(cleanup$),
       map(() => ({
         data: JSON.stringify({
@@ -80,12 +89,15 @@ export class SseController {
     return int;
   }
   @Sse('time3')
-  sendTime3(@Req() request: Request): Observable<MessageEvent> {
+  sendTime3(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+  ): Observable<MessageEvent> {
     const cleanup$ = new Subject<void>();
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(1000).pipe(
+    const int = interval(60000 / Number(msgs)).pipe(
       takeUntil(cleanup$),
       map(() => ({
         data: JSON.stringify({
@@ -105,12 +117,15 @@ export class SseController {
     return int;
   }
   @Sse('time4')
-  sendTime4(@Req() request: Request): Observable<MessageEvent> {
+  sendTime4(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+  ): Observable<MessageEvent> {
     const cleanup$ = new Subject<void>();
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(1000).pipe(
+    const int = interval(60000 / Number(msgs)).pipe(
       takeUntil(cleanup$),
       map(() => ({
         data: JSON.stringify({
@@ -130,12 +145,15 @@ export class SseController {
     return int;
   }
   @Sse('time5')
-  sendTime5(@Req() request: Request): Observable<MessageEvent> {
+  sendTime5(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+  ): Observable<MessageEvent> {
     const cleanup$ = new Subject<void>();
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(1000).pipe(
+    const int = interval(60000 / Number(msgs)).pipe(
       takeUntil(cleanup$),
       map(() => ({
         data: JSON.stringify({
@@ -155,12 +173,15 @@ export class SseController {
     return int;
   }
   @Sse('time6')
-  sendTime6(@Req() request: Request): Observable<MessageEvent> {
+  sendTime6(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+  ): Observable<MessageEvent> {
     const cleanup$ = new Subject<void>();
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(1000).pipe(
+    const int = interval(60000 / Number(msgs)).pipe(
       takeUntil(cleanup$),
       map(() => ({
         data: JSON.stringify({
@@ -182,6 +203,7 @@ export class SseController {
 
   private setupRequestCleanup(request: Request, clientId: string) {
     this.logger.log(`SSE client connected: ${clientId}`);
+    this.metricsService.recordSSEConnection('connect', clientId);
 
     (request as any).on('close', () => {
       this.handleDisconnect(clientId);
@@ -199,22 +221,12 @@ export class SseController {
       cleanup$.complete();
       (cleanup$ as any) = null;
       SseController.cleanupMap.delete(clientId);
+      this.metricsService.recordSSEConnection('disconnect', clientId);
     }
     this.logger.debug(`SSE client disconnected: ${clientId}`);
 
     if (SseController.cleanupMap.size === 0) {
       this.logger.warn(`Cleaned all SSE intervals`);
     }
-  }
-
-  @Post('broadcast')
-  broadcast(@Body() data: { message: string; channel?: string }) {
-    const channel = data.channel || 'default';
-    this.sseService.broadcast(channel, {
-      message: data.message,
-      timestamp: new Date().toISOString(),
-      type: 'broadcast',
-    });
-    return { status: 'sent', channel };
   }
 }

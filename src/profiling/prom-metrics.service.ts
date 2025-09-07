@@ -15,6 +15,7 @@ export class PrometheusMetricsService {
   private readonly heapUsedGauge: Gauge<string>;
   private readonly memoryDeltaHistogram: Histogram<string>;
   private readonly activeConnectionsGauge: Gauge<string>;
+  private readonly sseConnectionsTotal: Counter<string>;
 
   private readonly endpointMemoryGauge: Gauge<string>;
   private readonly endpointMemoryDeltaHistogram: Histogram<string>;
@@ -63,6 +64,12 @@ export class PrometheusMetricsService {
       help: 'Memory delta per HTTP request in MB',
       labelNames: ['method', 'route'],
       buckets: [-50, -10, -5, -1, 0, 1, 5, 10, 25, 50, 100],
+    });
+
+    this.sseConnectionsTotal = new Counter({
+      name: 'sse_connections_total',
+      help: 'Total SSE connections',
+      labelNames: ['event', 'client_id'],
     });
 
     // Active connections gauge
@@ -221,8 +228,15 @@ export class PrometheusMetricsService {
     });
   }
 
+  recordSSEConnection(event: 'connect' | 'disconnect', clientId: string) {
+    this.sseConnectionsTotal.inc({
+      event,
+      client_id: clientId.substring(0, 8),
+    });
+  }
+
   recordWebSocketConnection(
-    event: string,
+    event: 'connect' | 'disconnect',
     clientId: string,
     memoryUsed: number,
   ) {
