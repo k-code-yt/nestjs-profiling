@@ -250,7 +250,8 @@
     <div class="log" id="activityLog"></div>
 
     <script>
-      const BASE_URL = 'https://monitoring.local';
+      const BASE_URL = 'http://monitoring.local';
+      const MSGS_PER_MINUTE_QUERY = '?msgs=30';
       const SSE_ENDPOINTS = [
         '/sse/time1',
         '/sse/time2',
@@ -404,7 +405,7 @@
 
         log(`🔌 Connecting to random endpoint: ${selectedEndpoint}`, 'info');
 
-        const url = BASE_URL + selectedEndpoint;
+        const url = BASE_URL + selectedEndpoint + MSGS_PER_MINUTE_QUERY;
         const es = new EventSource(url);
 
         es.onopen = function () {
@@ -514,7 +515,7 @@
         log('🚀 Starting 6 SSE connections...', 'info');
 
         SSE_ENDPOINTS.forEach((endpoint, index) => {
-          const url = BASE_URL + endpoint;
+          const url = BASE_URL + endpoint + MSGS_PER_MINUTE_QUERY;
           log(`🔌 Connecting to ${url}`, 'info');
 
           const es = new EventSource(url);

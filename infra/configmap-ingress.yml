@@ -1,0 +1,15 @@
+apiVersion: v1
+data:
+  allow-snippet-annotations: 'true'
+  # Set to true for HTTP2
+  enable-http2: 'false'
+  hsts: 'false'
+  use-http2: 'false'
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+  name: ingress-nginx-controller
+  namespace: ingress-nginx

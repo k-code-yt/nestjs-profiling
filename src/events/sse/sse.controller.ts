@@ -7,7 +7,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { Observable, Subject, interval, map, takeUntil, tap } from 'rxjs';
-import { SseService } from './sse.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 
 interface PodInfo {
@@ -22,10 +21,7 @@ export class SseController {
   private podInfo: PodInfo;
   private isLogMessage: boolean = false;
 
-  constructor(
-    private readonly sseService: SseService,
-    private readonly metricsService: PrometheusMetricsService,
-  ) {
+  constructor(private readonly metricsService: PrometheusMetricsService) {
     this.podInfo = {
       podName: process.env.POD_NAME || process.env.HOSTNAME || 'localhost',
       podIp: process.env.POD_IP || 'unknown',
