@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
   annotations:
     # HTTP2
-    # nginx.ingress.kubernetes.io/http2-push-preload: 'true'
+    nginx.ingress.kubernetes.io/http2-push-preload: 'true'
     # nginx.ingress.kubernetes.io/ssl-redirect: 'true'
     # nginx.ingress.kubernetes.io/force-ssl-redirect: 'true'
 

@@ -15,6 +15,7 @@ import { WSConnectionTracker } from './ws-connection-tracker';
 import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 import * as os from 'os';
+import { generateLargePayload } from '../helper';
 
 interface PodInfo {
   podName: string;
@@ -59,9 +60,24 @@ export class WebsocketGateway
   handleConnection(client: Socket) {
     this.logger.debug(`Client connected: ${client.id}`);
     this.connectionTracker.trackConnection('connect', client);
+
+    const interval = setInterval(() => {
+      const payload = generateLargePayload();
+      const payloadStr = JSON.stringify({ payload, ...this.podInfo });
+
+      this.logger.debug(`WS payload size: ${payloadStr.length} bytes`);
+
+      client.emit('message', payload);
+    }, 1000);
+
+    (client as any).largeDataInterval = interval;
   }
 
   handleDisconnect(client: Socket) {
+    if ((client as any).largeDataInterval) {
+      clearInterval((client as any).largeDataInterval);
+    }
+
     this.connectionTracker.trackConnection('disconnect', client);
     client.removeAllListeners();
     client.disconnect(true);

@@ -254,6 +254,6 @@ export class PrometheusMetricsService {
     this.wsMemoryDelta.observe({ event }, memoryDelta);
     this.wsMemoryUsage.set({ event }, currentMemoryMB);
     this.wsMessageDuration.observe({ event }, duration);
-    Logger.debug(`recording WS for event: ${event}`);
+    // Logger.debug(`recording WS for event: ${event}`);
   }
 }

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Observable, Subject, interval, map, takeUntil, tap } from 'rxjs';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
+import { generateLargePayload } from '../helper';
 
 interface PodInfo {
   podName: string;
@@ -47,15 +48,13 @@ export class SseController {
         }),
         type: 'time-update',
       })),
-      tap((event) => {
-        this.isLogMessage && this.logger.log('SSE event sent', { event });
-      }),
     );
 
     this.setupRequestCleanup(request, id);
 
     return int;
   }
+
   @Sse('time2')
   sendTime2(
     @Req() request: Request,
@@ -65,23 +64,24 @@ export class SseController {
     const id = (request as any)?.id as string;
     SseController.cleanupMap.set(id, cleanup$);
 
-    const int = interval(60000 / Number(msgs)).pipe(
+    const int = interval(1000).pipe(
       takeUntil(cleanup$),
-      map(() => ({
-        data: JSON.stringify({
-          time: new Date().toISOString(),
-          timestamp: Date.now(),
-          ...this.podInfo,
-        }),
-        type: 'time-update',
-      })),
-      tap((event) => {
-        this.isLogMessage && this.logger.log('SSE event sent', { event });
+      map(() => {
+        const payload = generateLargePayload();
+        const payloadStr = JSON.stringify({ payload, ...this.podInfo });
+
+        if (!this.isLogMessage) {
+          this.logger.log(`SSE payload size: ${payloadStr.length} bytes`);
+        }
+
+        return {
+          data: payloadStr,
+          type: 'message',
+        };
       }),
     );
 
     this.setupRequestCleanup(request, id);
-
     return int;
   }
   @Sse('time3')
@@ -103,9 +103,6 @@ export class SseController {
         }),
         type: 'time-update',
       })),
-      tap((event) => {
-        this.isLogMessage && this.logger.log('SSE event sent', { event });
-      }),
     );
 
     this.setupRequestCleanup(request, id);
@@ -131,9 +128,6 @@ export class SseController {
         }),
         type: 'time-update',
       })),
-      tap((event) => {
-        this.isLogMessage && this.logger.log('SSE event sent', { event });
-      }),
     );
 
     this.setupRequestCleanup(request, id);
@@ -159,9 +153,6 @@ export class SseController {
         }),
         type: 'time-update',
       })),
-      tap((event) => {
-        this.isLogMessage && this.logger.log('SSE event sent', { event });
-      }),
     );
 
     this.setupRequestCleanup(request, id);
@@ -187,9 +178,6 @@ export class SseController {
         }),
         type: 'time-update',
       })),
-      tap((event) => {
-        this.isLogMessage && this.logger.log('SSE event sent', { event });
-      }),
     );
 
     this.setupRequestCleanup(request, id);

@@ -23,7 +23,7 @@ async function simulateSSEConnections(config?: {
   const errList: string[] = [];
 
   const {
-    url = 'https://monitoring.local/sse/time1',
+    url = 'http://localhost:3000/sse/time1',
     connectionCount = 5,
     durationSeconds = 15,
   } = config || {};
