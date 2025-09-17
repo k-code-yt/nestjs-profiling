@@ -7,7 +7,7 @@ async function simulateWebSocketConnections(config?: {
   durationSeconds: number;
 }) {
   const {
-    url = 'ws://localhost:3000',
+    url = 'wss://monitoring.local/performance',
     connectionCount = 100,
     messagesPerMinute = 10,
     durationSeconds = 120,
@@ -41,30 +41,20 @@ async function simulateWebSocketConnections(config?: {
       stats.messagesReceived++;
     });
 
-    const int = setInterval(() => {
-      socket.emit('message', {
-        message: `user#${i}`,
-      });
-    }, 60000 / messagesPerMinute);
-
     socket.on('error', () => {
       stats.errors++;
-      clearInterval(int);
       (socket as any)?.disconnect();
     });
 
-    connections.push({ socket, int } as never);
+    connections.push({ socket, int: null } as never);
 
-    // Small delay to avoid overwhelming server
     if (i % 50 === 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 
-  // Wait for test duration
   await new Promise((resolve) => setTimeout(resolve, durationSeconds * 1000));
 
-  // Close all connections
   connections.forEach(({ socket, interval }) => {
     clearInterval(interval);
     (socket as any).removeAllListeners();
@@ -79,7 +69,7 @@ async function simulateWebSocketConnections(config?: {
     messagesPerSecond: stats.messagesReceived / totalTime,
     errors: stats.errors,
     testDuration: totalTime,
-    memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024, // MB
+    memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024,
   };
 }
 

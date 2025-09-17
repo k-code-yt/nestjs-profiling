@@ -10,13 +10,6 @@ import { tap } from 'rxjs/operators';
 import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 
-// TODOs
-// - Test conditions same for each
-// - Start collecting performance metrics
-//     - how to download/where to store
-//     - sse via http2 vs ws
-// - How to enable and disable http2
-//     - Save secrets into file
 @Injectable()
 export class WSMemoryTrackingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('WSMemoryTracker');
