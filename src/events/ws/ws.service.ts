@@ -26,8 +26,19 @@ interface PodInfo {
 @WebSocketGateway({
   cors: {
     origin: '*',
+    credentials: true,
   },
   namespace: 'performance',
+  // Force WebSocket compression
+  compression: true,
+  perMessageDeflate: true, // Simplified - force enable
+  // Additional options
+  transports: ['websocket'], // WebSocket only
+  allowEIO3: false,
+  httpCompression: true,
+  // Engine.IO options for compression
+  pingTimeout: 60000,
+  pingInterval: 25000,
 })
 export class WebsocketGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -53,21 +64,57 @@ export class WebsocketGateway
     };
   }
 
-  afterInit(server: Server) {
+  afterInit(req: any) {
+    const server = req.server;
     this.logger.debug('WebSocket Gateway initialized');
+
+    server.engine.opts.perMessageDeflate = {
+      threshold: 1024,
+      concurrencyLimit: 10,
+      // Enable compression
+      serverMaxWindowBits: 15,
+      clientMaxWindowBits: 15,
+      serverNoContextTakeover: false,
+      clientNoContextTakeover: false,
+    };
+
+    // Force compression on connection
+    server.engine.on('connection', (socket) => {
+      this.logger.debug(
+        `Engine connection: ${socket.id}, transport: ${socket.transport?.name}`,
+      );
+
+      if (socket.transport?.name === 'websocket') {
+        // Enable per-message deflate
+        socket.transport.perMessageDeflate = true;
+        this.logger.debug('WebSocket compression enabled for connection');
+      }
+    });
   }
 
   handleConnection(client: Socket) {
     this.logger.debug(`Client connected: ${client.id}`);
     this.connectionTracker.trackConnection('connect', client);
 
+    // Enable compression for this specific client
+    if (client.conn && client.conn.transport) {
+      (client.conn.transport as any).supportsBinary = true;
+    }
+
     const interval = setInterval(() => {
       const payload = generateLargePayload();
-      const payloadStr = JSON.stringify({ payload, ...this.podInfo });
+      const messageData = {
+        payload,
+        ...this.podInfo,
+        timestamp: new Date().toISOString(),
+        compressed: true, // Indicate compression is enabled
+      };
 
+      const payloadStr = JSON.stringify(messageData);
       this.logger.debug(`WS payload size: ${payloadStr.length} bytes`);
 
-      client.emit('message', payload);
+      // Use binary mode if available for better compression
+      client.compress(true).emit('message', messageData);
     }, 1000);
 
     (client as any).largeDataInterval = interval;
@@ -101,11 +148,15 @@ export class WebsocketGateway
       originalMsg = data?.message;
     }
 
-    this.server.to(client.id).emit('message', {
+    const responseData = {
       originalMsg,
       timestamp: new Date().toISOString(),
       ...this.podInfo,
-    });
+      compressed: true,
+    };
+
+    // Enable compression for response
+    this.server.to(client.id).compress(true).emit('message', responseData);
 
     return 'Message received';
   }

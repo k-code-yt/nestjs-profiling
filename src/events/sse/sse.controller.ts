@@ -5,9 +5,14 @@ import {
   Logger,
   Req,
   Query,
+  Get,
+  Header,
+  Res,
 } from '@nestjs/common';
 import { Observable, Subject, interval, map, takeUntil, tap } from 'rxjs';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
+import * as zlib from 'zlib';
+import { Transform } from 'stream';
 import { generateLargePayload } from '../helper';
 
 interface PodInfo {
@@ -27,6 +32,11 @@ export class SseController {
       podName: process.env.POD_NAME || process.env.HOSTNAME || 'localhost',
       podIp: process.env.POD_IP || 'unknown',
     };
+  }
+
+  @Get('health')
+  getHealth() {
+    return 'hello there';
   }
 
   @Sse('time1')
@@ -55,35 +65,70 @@ export class SseController {
     return int;
   }
 
-  @Sse('time2')
-  sendTime2(
-    @Req() request: Request,
-    @Query('msgs') msgs: string,
-  ): Observable<MessageEvent> {
-    const cleanup$ = new Subject<void>();
-    const id = (request as any)?.id as string;
-    SseController.cleanupMap.set(id, cleanup$);
+  // SSE with compression - Method 2: Using Transform stream (FIXED)
+  @Get('time2')
+  @Header('Content-Type', 'text/event-stream')
+  @Header('Content-Encoding', 'gzip')
+  @Header(
+    'Cache-Control',
+    'private, no-cache, no-store, must-revalidate, max-age=0, no-transform',
+  )
+  @Header('Connection', 'keep-alive')
+  @Header('X-Accel-Buffering', 'no')
+  async getTimeStreamCompressed2(@Res() res: Response) {
+    // Create gzip stream with immediate flushing for streaming
+    const gzip = zlib.createGzip({
+      level: 1, // Lower compression for faster streaming
+      chunkSize: 256, // Smaller chunks
+      windowBits: 15,
+      memLevel: 8,
+      strategy: zlib.constants.Z_FILTERED, // Better for streaming
+      flush: zlib.constants.Z_SYNC_FLUSH, // Force immediate flush
+    });
 
-    const int = interval(1000).pipe(
-      takeUntil(cleanup$),
-      map(() => {
-        const payload = generateLargePayload();
-        const payloadStr = JSON.stringify({ payload, ...this.podInfo });
-
-        if (!this.isLogMessage) {
-          this.logger.log(`SSE payload size: ${payloadStr.length} bytes`);
-        }
-
-        return {
-          data: payloadStr,
-          type: 'message',
-        };
-      }),
+    // Set headers
+    (res as any).setHeader('Content-Type', 'text/event-stream');
+    (res as any).setHeader('Content-Encoding', 'gzip');
+    (res as any).setHeader(
+      'Cache-Control',
+      'private, no-cache, no-store, must-revalidate, max-age=0, no-transform',
     );
+    (res as any).setHeader('Connection', 'keep-alive');
+    (res as any).setHeader('X-Accel-Buffering', 'no');
 
-    this.setupRequestCleanup(request, id);
-    return int;
+    // Pipe gzip directly to response
+    gzip.pipe(res as any);
+
+    let eventId = 1;
+    const intervalId = setInterval(() => {
+      const data = {
+        time: new Date().toISOString(),
+        timestamp: Date.now(),
+        payload: 'large payload data '.repeat(100), // Add some data to compress
+        ...this.podInfo,
+      };
+
+      const sseData = `event: time-update\nid: ${eventId++}\ndata: ${JSON.stringify(data)}\n\n`;
+
+      // Write to gzip and FORCE immediate flush
+      gzip.write(sseData, () => {
+        gzip.flush(zlib.constants.Z_SYNC_FLUSH); // Critical: Force immediate flush
+      });
+    }, 1000);
+
+    // Cleanup on client disconnect
+    (res as any).on('close', () => {
+      clearInterval(intervalId);
+      gzip.end();
+    });
+
+    (res as any).on('error', (err) => {
+      console.error('Response error:', err);
+      clearInterval(intervalId);
+      gzip.end();
+    });
   }
+
   @Sse('time3')
   sendTime3(
     @Req() request: Request,

@@ -250,7 +250,7 @@
     <div class="log" id="activityLog"></div>
 
     <script>
-      const BASE_URL = 'http://localhost:3000';
+      const BASE_URL = 'https://monitoring.local';
       const MSGS_PER_MINUTE_QUERY = '?msgs=30';
       const SSE_ENDPOINTS = [
         '/sse/time1',
@@ -348,11 +348,11 @@
 
           if (podInfo) {
             podInfoHtml = `
-              <div class="pod-info">
-                <span class="pod-name">Pod: ${podInfo.podName}</span>
-                <span class="pod-ip">IP: ${podInfo.podIp}</span>
-              </div>
-            `;
+                <div class="pod-info">
+                  <span class="pod-name">Pod: ${podInfo.podName}</span>
+                  <span class="pod-ip">IP: ${podInfo.podIp}</span>
+                </div>
+              `;
           }
 
           if (
@@ -361,27 +361,27 @@
           ) {
             statusEl.className += ' connected';
             statusEl.innerHTML = `
-              Connection ${index + 1} (${endpoint}): CONNECTED
-              ${podInfoHtml}
-            `;
+                Connection ${index + 1} (${endpoint}): CONNECTED
+                ${podInfoHtml}
+              `;
           } else if (
             eventSources[index] &&
             eventSources[index].readyState === EventSource.CONNECTING
           ) {
             statusEl.className += ' pending';
             statusEl.innerHTML = `
-              Connection ${index + 1} (${endpoint}): CONNECTING...
-              ${podInfoHtml}
-            `;
+                Connection ${index + 1} (${endpoint}): CONNECTING...
+                ${podInfoHtml}
+              `;
           } else if (
             eventSources[index] &&
             eventSources[index].readyState === EventSource.CLOSED
           ) {
             statusEl.className += ' error';
             statusEl.innerHTML = `
-              Connection ${index + 1} (${endpoint}): CLOSED
-              ${podInfoHtml}
-            `;
+                Connection ${index + 1} (${endpoint}): CLOSED
+                ${podInfoHtml}
+              `;
           } else {
             statusEl.className += ' info';
             statusEl.innerHTML = `Connection ${index + 1} (${endpoint}): NOT STARTED`;
@@ -536,6 +536,10 @@
           };
 
           es.onmessage = function (event) {
+            if (stats.messagesReceived === 1) {
+              console.log(`SSE message size: ${event.data.length} bytes`);
+              console.log('First few chars:', event.data.substring(0, 100));
+            }
             stats.messagesReceived++;
 
             try {
@@ -561,6 +565,37 @@
             updateStats();
             updateConnectionStatus();
           };
+
+          es.addEventListener('time-update', (event) => {
+            if (stats.messagesReceived === 1) {
+              console.log(`SSE message size: ${event.data.length} bytes`);
+              console.log('First few chars:', event.data.substring(0, 100));
+            }
+            stats.messagesReceived++;
+
+            try {
+              const data = JSON.parse(event.data);
+              if (data.podName && data.podIp) {
+                checkPodChange(index, {
+                  podName: data.podName,
+                  podIp: data.podIp,
+                });
+              }
+
+              log(
+                `📨 Message from connection ${index + 1} (${data.podName || 'unknown pod'})`,
+                'info',
+              );
+            } catch (e) {
+              log(
+                `📨 Message from connection ${index + 1}: ${event.data.substring(0, 50)}...`,
+                'info',
+              );
+            }
+
+            updateStats();
+            updateConnectionStatus();
+          });
 
           es.onerror = function (error) {
             log(

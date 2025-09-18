@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: haproxy
+  template:
+    metadata:
+      labels:
+        app: haproxy
+    spec:
+      containers:
+        - name: haproxy
+          image: haproxy:2.9-alpine
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+            - containerPort: 8080 # Stats
+          volumeMounts:
+            - name: haproxy-config
+              mountPath: /usr/local/etc/haproxy/haproxy.cfg
+              subPath: haproxy.cfg
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs/
+          # Use init container to prepare SSL certificates
+      initContainers:
+        - name: ssl-prep
+          image: busybox:1.35
+          command: ['/bin/sh', '-c']
+          args:
+            - |
+              # Create combined PEM file for HAProxy with correct name
+              cat /tmp/ssl/tls.crt /tmp/ssl/tls.key > /etc/ssl/certs/monitoring.local.pem
+              chmod 644 /etc/ssl/certs/monitoring.local.pem
+              ls -la /etc/ssl/certs/
+              echo "SSL cert prepared successfully"
+          volumeMounts:
+            - name: ssl-certs-tmp
+              mountPath: /tmp/ssl/
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs/
+          resources:
+            requests:
+              memory: '64Mi'
+              cpu: '50m'
+            limits:
+              memory: '128Mi'
+              cpu: '100m'
+      volumes:
+        - name: haproxy-config
+          configMap:
+            name: haproxy-config
+        - name: ssl-certs-tmp
+          secret:
+            secretName: monitoring-tls
+        - name: ssl-certs
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy
+  namespace: monitoring
+spec:
+  type: LoadBalancer
+  selector:
+    app: haproxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+    - name: https
+      port: 443
+      targetPort: 443
+      nodePort: 30443
+    - name: stats
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808

@@ -324,7 +324,7 @@
           <input
             type="text"
             id="serverUrl"
-            value="ws://localhost:3000/performance"
+            value="wss://monitoring.local/performance"
             placeholder="wss://your-server/performance"
           />
         </div>
@@ -542,10 +542,18 @@
 
         try {
           const socket = io(conn.url, {
-            transports: ['websocket', 'polling'],
+            transports: ['websocket'],
+            upgrade: true,
+            rememberUpgrade: true,
           });
 
           socket.on('connect', () => {
+            if (socket.io.engine.transport.socket) {
+              const ws = socket.io.engine.transport.socket;
+              console.log('WebSocket extensions:', ws.extensions);
+              console.log('Protocol:', ws.protocol);
+            }
+
             conn.socket = socket;
             conn.connected = true;
             updateConnectionStatus(connectionId, 'connected');

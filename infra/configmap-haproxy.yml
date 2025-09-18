@@ -1,0 +1,115 @@
+# Complete HAProxy setup for Minikube
+---
+# HAProxy ConfigMap with compression
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: monitoring
+data:
+  haproxy.cfg: |
+    global
+        daemon
+        log stdout local0 info
+        stats timeout 30s
+
+    defaults
+        mode http
+        log global
+        option httplog
+        option dontlognull
+        option log-health-checks
+        option forwardfor except 127.0.0.0/8
+        option redispatch
+        
+        # Timeouts for streaming
+        timeout connect 5000ms
+        timeout client 86400s
+        timeout server 86400s
+        timeout tunnel 86400s
+        timeout http-keep-alive 10s
+        timeout http-request 15s
+        
+        # CRITICAL: Compression for streaming (remove offload from defaults)
+        compression algo gzip deflate
+        compression type text/html text/css text/javascript text/plain text/xml application/javascript application/json text/event-stream application/xml application/rss+xml image/svg+xml
+
+    # Stats interface
+    frontend stats
+        bind *:8080
+        stats enable
+        stats uri /
+        stats refresh 10s
+        stats admin if TRUE
+
+    # HTTP frontend - redirect to HTTPS
+    frontend http_frontend
+        bind *:80
+        redirect scheme https code 301 if !{ ssl_fc }
+
+    # HTTPS frontend with HTTP/2 and compression
+    frontend https_frontend
+        bind *:443 ssl crt /etc/ssl/certs/monitoring.local.pem alpn h2,http/1.1
+        
+        # Security headers
+        http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        http-response set-header X-Frame-Options "SAMEORIGIN"
+        http-response set-header X-Content-Type-Options "nosniff"
+        http-response set-header Vary "Accept-Encoding"
+        
+        # Route based on path
+        acl is_sse path_beg /sse/
+        acl is_websocket path_beg /socket.io/
+        acl is_websocket hdr(Upgrade) -i websocket
+        acl is_grafana path_beg /grafana
+        acl is_prometheus path_beg /prometheus
+        
+        use_backend nestjs_sse if is_sse
+        use_backend nestjs_websocket if is_websocket
+        use_backend grafana_backend if is_grafana
+        use_backend prometheus_backend if is_prometheus
+        default_backend nestjs_backend
+
+    # Backend for SSE - streaming with compression
+    backend nestjs_sse
+        option http-no-delay
+        option httpchk GET /sse/health
+        
+        # Enable compression for SSE
+        compression algo gzip deflate
+        compression type text/event-stream application/json text/plain
+        
+        server nestjs-app nestjs-app:3000 check inter 5s rise 2 fall 3
+
+    # Backend for WebSocket
+    backend nestjs_websocket
+        option http-no-delay
+        server nestjs-app nestjs-app:3000
+
+    # Default backend with full compression
+    backend nestjs_backend
+        option httpchk GET /sse/health
+        
+        # Enable compression
+        compression algo gzip deflate
+        compression type text/html text/css text/javascript text/plain text/xml application/javascript application/json application/xml application/rss+xml image/svg+xml
+        
+        server nestjs-app nestjs-app:3000 check inter 5s rise 2 fall 3
+
+    # Grafana backend
+    backend grafana_backend
+        option httpchk GET /api/health
+        
+        compression algo gzip deflate
+        compression type text/html text/css text/javascript application/json
+        
+        server grafana grafana:3000 check inter 10s rise 2 fall 3
+
+    # Prometheus backend
+    backend prometheus_backend
+        option httpchk GET /-/healthy
+        
+        compression algo gzip deflate
+        compression type text/plain application/json text/html
+        
+        server prometheus prometheus:9090 check inter 10s rise 2 fall 3
