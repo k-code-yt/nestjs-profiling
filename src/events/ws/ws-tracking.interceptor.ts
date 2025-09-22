@@ -49,6 +49,12 @@ export class WSMemoryTrackingInterceptor implements NestInterceptor {
           });
         }
 
+        this.prometheusMetricsService.recordWebSocketMemory(
+          'default',
+          endMemory.heapUsed,
+          memoryDeltaBytes,
+        );
+
         this.prometheusMetricsService.recordWebSocketMessage(
           eventName,
           memoryDeltaMB,

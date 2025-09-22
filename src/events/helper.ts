@@ -43,10 +43,35 @@ export const generateLargePayload = () => {
   };
 
   const jsonStr = JSON.stringify(baseData);
-  const targetSize = 10240; // 10kb
+  const targetSize = 50240; // 50kb
   if (jsonStr.length < targetSize) {
     baseData['padding'] = 'x'.repeat(Math.floor(targetSize - jsonStr.length));
   }
 
   return baseData;
+};
+
+export const generateNewsContent = () => {
+  return {
+    articles: Array(10)
+      .fill(null)
+      .map((_, i) => ({
+        id: i,
+        title: `Article ${i}: Important news about ${Math.random().toString(36)}`,
+        summary: 'Lorem ipsum '.repeat(50), // Large content for compression benefits
+        author: 'News Reporter',
+        category: ['Tech', 'Business', 'Sports'][i % 3],
+      })),
+    weather: {
+      temperature: Math.round(Math.random() * 40),
+      condition: ['Sunny', 'Cloudy', 'Rainy'][Math.floor(Math.random() * 3)],
+    },
+    stocks: Array(5)
+      .fill(null)
+      .map(() => ({
+        symbol: Math.random().toString(36).substr(2, 4).toUpperCase(),
+        price: (Math.random() * 1000).toFixed(2),
+        change: ((Math.random() - 0.5) * 10).toFixed(2),
+      })),
+  };
 };

@@ -60,7 +60,10 @@ data:
         # Route based on path
         acl is_sse path_beg /sse/
         acl is_websocket path_beg /socket.io/
-        acl is_websocket hdr(Upgrade) -i websocket
+        acl is_websocket_upgrade hdr(Upgrade) -i websocket
+        use_backend nestjs_websocket if is_websocket
+        use_backend nestjs_websocket if is_websocket_upgrade
+
         acl is_grafana path_beg /grafana
         acl is_prometheus path_beg /prometheus
         
@@ -84,6 +87,8 @@ data:
     # Backend for WebSocket
     backend nestjs_websocket
         option http-no-delay
+        http-request set-header Connection "upgrade"
+        http-request set-header Upgrade "websocket"        
         server nestjs-app nestjs-app:3000
 
     # Default backend with full compression

@@ -47,6 +47,10 @@ export class MemoryTrackingInterceptor implements NestInterceptor {
           external: endMemory.external - startMemory.external,
         };
 
+        const responseSize =
+          response.get('content-length') ||
+          Buffer.byteLength(JSON.stringify(response.locals || '{}'));
+
         const requestInfo = {
           method: request.method,
           url: request.url,
@@ -58,6 +62,7 @@ export class MemoryTrackingInterceptor implements NestInterceptor {
           memoryAfter: endMemory,
           memoryDelta,
           timestamp: new Date().toISOString(),
+          responseSize,
         };
 
         if (
@@ -79,6 +84,7 @@ export class MemoryTrackingInterceptor implements NestInterceptor {
       requestInfo.statusCode,
       requestInfo.duration / 1000,
       requestInfo.memoryDelta.heapUsed,
+      requestInfo?.responseSize ? Number(requestInfo?.responseSize) : 0,
     );
 
     this.prometheusMetricsService.recordEndpointMemory(

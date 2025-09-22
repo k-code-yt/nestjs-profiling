@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { WebsocketGateway } from './ws/ws.service';
-import { SseService } from './sse/sse.service';
+import { SSEBroadcastService } from './sse/sse-broadcast.service';
 import { SseController } from './sse/sse.controller';
 import { WSMemoryTrackingInterceptor } from './ws/ws-tracking.interceptor';
 import { ChatWebsocketGateway } from './ws/chat-room-ws.service';
@@ -9,7 +9,7 @@ import { ChatWebsocketGateway } from './ws/chat-room-ws.service';
   providers: [
     ChatWebsocketGateway,
     WebsocketGateway,
-    SseService,
+    SSEBroadcastService,
     WSMemoryTrackingInterceptor,
   ],
   controllers: [SseController],

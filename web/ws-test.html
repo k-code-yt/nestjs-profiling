@@ -449,16 +449,16 @@
         );
         if (data.podName && data.podIp && podInfoEl) {
           podInfoEl.innerHTML = `
-                       <div class="pod-detail">
-                           <strong>Pod:</strong> <span>${data.podName}</span>
-                       </div>
-                       <div class="pod-detail">
-                           <strong>IP:</strong> <span>${data.podIp}</span>
-                       </div>
-                       <div class="pod-detail">
-                           <strong>Socket:</strong> <span>${connections.get(connectionId).socket.id}</span>
-                       </div>
-                   `;
+                         <div class="pod-detail">
+                             <strong>Pod:</strong> <span>${data.podName}</span>
+                         </div>
+                         <div class="pod-detail">
+                             <strong>IP:</strong> <span>${data.podIp}</span>
+                         </div>
+                         <div class="pod-detail">
+                             <strong>Socket:</strong> <span>${connections.get(connectionId).socket.id}</span>
+                         </div>
+                     `;
           podInfoEl.style.display = 'block';
 
           connectedPods.add(data.podName);
@@ -476,26 +476,26 @@
         connectionCard.id = `conn-${connectionId}`;
 
         connectionCard.innerHTML = `
-                   <div class="connection-header">
-                       <div class="connection-id">Connection #${connectionId}</div>
-                       <div class="status disconnected">DISCONNECTED</div>
-                   </div>
+                     <div class="connection-header">
+                         <div class="connection-id">Connection #${connectionId}</div>
+                         <div class="status disconnected">DISCONNECTED</div>
+                     </div>
 
-                   <div class="connection-controls">
-                       <button class="connect-btn">Connect</button>
-                       <button class="disconnect-btn" disabled>Disconnect</button>
-                       <button class="send-btn" disabled>Send</button>
-                       <button class="remove-btn">Remove</button>
-                   </div>
+                     <div class="connection-controls">
+                         <button class="connect-btn">Connect</button>
+                         <button class="disconnect-btn" disabled>Disconnect</button>
+                         <button class="send-btn" disabled>Send</button>
+                         <button class="remove-btn">Remove</button>
+                     </div>
 
-                   <div class="pod-info" style="display: none;"></div>
+                     <div class="pod-info" style="display: none;"></div>
 
-                   <div class="messages">
-                       <div class="message">
-                           <span class="timestamp">[Ready]</span> Connection ${connectionId} ready to connect to ${url}
-                       </div>
-                   </div>
-               `;
+                     <div class="messages">
+                         <div class="message">
+                             <span class="timestamp">[Ready]</span> Connection ${connectionId} ready to connect to ${url}
+                         </div>
+                     </div>
+                 `;
 
         connectionsContainer.appendChild(connectionCard);
 
@@ -541,15 +541,40 @@
         );
 
         try {
+          // const socket = io(conn.url, {
+          //  transports: ['websocket'],
+          //  upgrade: true,
+          //  rememberUpgrade: true,
+          //});
+          const compressionTest = true;
           const socket = io(conn.url, {
             transports: ['websocket'],
+            forceNew: true,
             upgrade: true,
             rememberUpgrade: true,
+            // Enable compression for Socket.IO
+            compression: compressionTest,
+            perMessageDeflate: compressionTest
+              ? {
+                  threshold: 1024,
+                  concurrencyLimit: 10,
+                  serverMaxWindowBits: 15,
+                  clientMaxWindowBits: 15,
+                }
+              : false,
+            // Additional headers to request compression
+            extraHeaders: compressionTest
+              ? {
+                  'Accept-Encoding': 'gzip, deflate, br',
+                  'Sec-WebSocket-Extensions':
+                    'permessage-deflate; client_max_window_bits',
+                }
+              : {},
           });
 
           socket.on('connect', () => {
-            if (socket.io.engine.transport.socket) {
-              const ws = socket.io.engine.transport.socket;
+            const ws = socket.io?.engine?.transport?.ws;
+            if (ws) {
               console.log('WebSocket extensions:', ws.extensions);
               console.log('Protocol:', ws.protocol);
             }
