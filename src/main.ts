@@ -1,5 +1,8 @@
-import { NestFactory } from '@nestjs/core';
+import { NestApplication, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import * as compression from 'compression';
+import { constants } from 'zlib';
+import { INestApplication } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,6 +15,8 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
+  //   addCompressionMiddleware(app)
+
   process.on('warning', (warning) => {
     console.warn('Process Warning:', {
       name: warning.name,
@@ -22,15 +27,6 @@ async function bootstrap() {
 
   process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
-
-    const v8 = require('v8');
-    const fs = require('fs');
-    const snapshot = v8.getHeapSnapshot();
-    const fileStream = fs.createWriteStream(
-      `emergency-heap-${Date.now()}.heapsnapshot`,
-    );
-    snapshot.pipe(fileStream);
-
     setTimeout(() => process.exit(1), 5000);
   });
 
@@ -40,19 +36,29 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000);
 }
+
+function addCompressionMiddleware(app: INestApplication) {
+  app.use(
+    compression({
+      filter: (req, res) => {
+        return req.headers.accept?.includes('text/event-stream') || false;
+      },
+      level: 4,
+      flush: constants.Z_SYNC_FLUSH,
+      //   brotli: {
+      //     flush: constants.BROTLI_OPERATION_FLUSH,
+      //     finishFlush: constants.BROTLI_OPERATION_FINISH,
+      //     chunkSize: 12 * 1024,
+      //     params: {
+      //       [constants.BROTLI_PARAM_QUALITY]: 2,
+      //       [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
+      //     },
+      //   },
+      //   zlib: {
+      //     flush: constants.Z_SYNC_FLUSH,
+      //   },
+    }),
+  );
+}
+
 bootstrap();
-
-// HIGH LOAD
-// connectionCount: 1000,
-//   messagesPerMinute: 60,
-//   durationSeconds: 120
-
-// Medium Load
-//   connectionCount: 500,
-//   messagesPerMinute: 30,
-//   durationSeconds: 300
-
-// Low Load
-// connectionCount: 100,
-//   messagesPerMinute: 10,
-//   durationSeconds: 600

@@ -15,7 +15,8 @@ import { WSConnectionTracker } from './ws-connection-tracker';
 import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 import * as os from 'os';
-import { generateLargePayload } from '../helper';
+import { generateNewsletterJSON } from '../helper';
+import { NewsletterBroadcastService } from '../newsletter-broadcast-shared.service';
 
 interface PodInfo {
   podName: string;
@@ -28,16 +29,17 @@ interface PodInfo {
     origin: '*',
     credentials: true,
   },
-  namespace: 'performance',
-  compression: true,
-  perMessageDeflate: true,
-  transports: ['websocket'],
-  allowEIO3: false,
-  httpCompression: true,
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  namespace: 'with-cmpn',
+
+  //   compression: true,
+  //   perMessageDeflate: true,
+  //   transports: ['websocket'],
+  //   allowEIO3: false,
+  //   httpCompression: true,
+  //   pingTimeout: 60000,
+  //   pingInterval: 25000,
 })
-export class WebsocketGateway
+export class WebsocketGatewayWithCompression
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   private logger: Logger = new Logger('WebsocketGateway');
@@ -49,6 +51,7 @@ export class WebsocketGateway
   constructor(
     private readonly memoryProfilingService: MemoryProfilingService,
     private readonly prometheusMetricsService: PrometheusMetricsService,
+    private readonly newsletterBroadcastService: NewsletterBroadcastService,
   ) {
     this.connectionTracker = new WSConnectionTracker(
       this.memoryProfilingService,
@@ -78,66 +81,13 @@ export class WebsocketGateway
   handleConnection(client: Socket) {
     const transport = client?.conn?.transport?.name;
     this.logger.debug(
-      `Engine connection: ${client.id}, transport: ${transport}`,
+      `WS WITH Compression connected: ${client.id}, transport: ${transport}`,
     );
 
     this.connectionTracker.trackConnection('connect', client);
 
     if (client.conn && client.conn.transport) {
       (client.conn.transport as any).supportsBinary = true;
-    }
-
-    const interval = setInterval(() => {
-      const payload = JSON.stringify(generateLargePayload());
-      const messageData = {
-        payload,
-        ...this.podInfo,
-        timestamp: new Date().toISOString(),
-        compressed: true,
-      };
-
-      this.setupSimpleByteTracking(client, payload);
-      client.compress(true).emit('message', messageData);
-    }, 1000);
-
-    (client as any).largeDataInterval = interval;
-  }
-
-  private setupSimpleByteTracking(client: Socket, uncompressed: string) {
-    if ((client as any)._byteTrackingSetup) return;
-    (client as any)._byteTrackingSetup = true;
-
-    let totalBytesSent = 0;
-
-    const conn = client.conn as any;
-    if (conn && conn?.write) {
-      const originalWrite = conn.write.bind(client.conn);
-
-      client.conn.write = (data: any, encoding, callback) => {
-        const bytes = Buffer.isBuffer(data)
-          ? data.length
-          : Buffer.byteLength(String(data), 'utf8');
-        totalBytesSent += bytes;
-        const uncompressedBytes = uncompressed.length;
-
-        // Record actual network bytes
-        this.prometheusMetricsService.recordNetworkBytes(
-          'websocket',
-          'sent',
-          bytes,
-          client.id,
-        );
-
-        this.prometheusMetricsService.recordWebSocketBytes(
-          'sent',
-          bytes,
-          'deflate',
-          client.id,
-          uncompressedBytes,
-        );
-
-        return originalWrite(data, encoding, callback);
-      };
     }
   }
 
@@ -149,55 +99,60 @@ export class WebsocketGateway
     this.connectionTracker.trackConnection('disconnect', client);
     client.removeAllListeners();
     client.disconnect(true);
+    this.newsletterBroadcastService.removeConnection(client.id);
     this.logger.debug(`Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage('message')
-  handleMessage(
-    @MessageBody() data: any,
-    @ConnectedSocket() client: Socket,
-  ): string {
+  handleMessage(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
     this.logger.log(
       `Received message from ${client.id}: ${JSON.stringify(data)}`,
     );
 
-    let originalMsg;
+    let originalMsg: {
+      type: string;
+      messagesPerMinute: number;
+      clientId: number;
+      timestamp: string;
+    } = {} as any;
     if (data && typeof data === 'string') {
-      originalMsg = JSON.parse(data)?.message;
+      originalMsg = JSON.parse(data);
     }
     if (data && typeof data === 'object') {
-      originalMsg = data?.message;
+      originalMsg = data;
     }
 
-    const responseData = {
-      originalMsg,
-      timestamp: new Date().toISOString(),
-      ...this.podInfo,
-      compressed: true,
-    };
+    const messagesPerMinute = originalMsg?.messagesPerMinute || 60;
+    Logger.debug(`recieved msg per min ${messagesPerMinute}`, 'WS');
+    const interval = setInterval(
+      () => {
+        const payload = JSON.stringify(generateNewsletterJSON());
+        const messageData = {
+          payload,
+          ...this.podInfo,
+          timestamp: new Date().toISOString(),
+          compressed: true,
+          originalSize: payload.length,
+        };
 
-    // Enable compression for response
-    this.server.to(client.id).compress(true).emit('message', responseData);
+        client.compress(true).emit('message', messageData);
+      },
+      60000 / Number(originalMsg.messagesPerMinute),
+    );
 
-    return 'Message received';
+    (client as any).largeDataInterval = interval;
   }
 
-  @SubscribeMessage('compressed')
-  handleCompressed(
+  @SubscribeMessage('newsletter')
+  handleNewsletter(
     @MessageBody() data: any,
     @ConnectedSocket() client: Socket,
-  ): void {
-    this.sendMessageWithMetrics(client, 'compressed', data, 'large-payload');
-  }
-
-  private sendMessageWithMetrics(
-    client: Socket,
-    event: string,
-    data: any,
-    payloadType: string,
   ) {
-    const originalSize = Buffer.byteLength(JSON.stringify(data), 'utf8');
-
-    client.compress(true).emit(event, data);
+    this.newsletterBroadcastService.addWSConnection(
+      client.id,
+      client,
+      true,
+      this.server,
+    );
   }
 }

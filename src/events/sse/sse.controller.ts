@@ -12,8 +12,8 @@ import {
 import { Observable, Subject, interval, map, takeUntil, tap } from 'rxjs';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 import * as zlib from 'zlib';
-import { generateLargePayload, generateNewsContent } from '../helper';
-import { SSEBroadcastService } from './sse-broadcast.service';
+import { generateNewsletterJSON } from '../helper';
+import { NewsletterBroadcastService } from '../newsletter-broadcast-shared.service';
 
 type PodInfo = {
   podName: string;
@@ -37,7 +37,7 @@ export class SseController {
 
   constructor(
     private readonly metricsService: PrometheusMetricsService,
-    private readonly broadcastService: SSEBroadcastService,
+    private readonly newsletterBroadcastService: NewsletterBroadcastService,
   ) {
     this.podInfo = {
       podName: process.env.POD_NAME || process.env.HOSTNAME || 'localhost',
@@ -53,95 +53,54 @@ export class SseController {
   @Get('time-brotli')
   async getTimeStreamBrotli(@Res() res: Response) {
     const connectionId = this.generateConnectionId();
+    Logger.debug('New conn established', 'BROTLI');
     this.trackConnection(connectionId, 'time-brotli', 'brotli');
+    this.metricsService.recordSSEConnection('connect', connectionId);
 
     const brotliStream = zlib.createBrotliCompress({
       params: {
-        [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_GENERIC,
-        [zlib.constants.BROTLI_PARAM_QUALITY]: 1,
-        [zlib.constants.BROTLI_PARAM_LGWIN]: 16,
+        [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_TEXT,
+        [zlib.constants.BROTLI_PARAM_QUALITY]: 4,
+        [zlib.constants.BROTLI_PARAM_LGWIN]: 22,
       },
     });
 
     this.setupSSEHeaders(res as any, 'br');
-
-    // Track actual compressed bytes
-    let totalCompressedBytes = 0;
-    let totalUncompressedBytes = 0;
-
-    const originalWrite = (res as any).write.bind(res);
-    (res as any).write = function (chunk: any, encoding?: any, callback?: any) {
-      if (Buffer.isBuffer(chunk)) {
-        totalCompressedBytes += chunk.length;
-      } else if (typeof chunk === 'string') {
-        totalCompressedBytes += Buffer.byteLength(chunk, encoding || 'utf8');
-      }
-      return originalWrite(chunk, encoding, callback);
-    };
-
     brotliStream.pipe(res as any);
 
     let eventId = 1;
     const intervalId = setInterval(() => {
-      const startTime = Date.now();
       const data = {
         time: new Date().toISOString(),
         timestamp: Date.now(),
-        payload: generateLargePayload(),
+        payload: generateNewsletterJSON(),
         eventId: eventId,
         compressionType: 'brotli',
         ...this.podInfo,
       };
 
       const sseData = `event: time-update\nid: ${eventId++}\ndata: ${JSON.stringify(data)}\n\n`;
-      const originalSize = Buffer.byteLength(sseData, 'utf8');
-      totalUncompressedBytes += originalSize;
-
-      const beforeCompressed = totalCompressedBytes;
-
       brotliStream.write(sseData, () => {
         brotliStream.flush();
-
-        const afterCompressed = totalCompressedBytes;
-        const actualCompressedSize = afterCompressed - beforeCompressed;
-        const latency = (Date.now() - startTime) / 1000;
-
-        this.metricsService.recordSSEBytes(
-          'time-brotli',
-          actualCompressedSize,
-          'brotli',
-          connectionId,
-          originalSize,
-          latency,
-        );
-
-        this.metricsService.recordMessageByType('large_payload', 'sse');
-        this.updateConnectionBandwidth(connectionId, actualCompressedSize);
       });
     }, 1000);
 
     this.setupSSECleanup(res as any, intervalId, connectionId, () => {
+      this.metricsService.recordSSEConnection('disconnect', connectionId);
       brotliStream.end();
       brotliStream.destroy();
     });
   }
 
-  @Get('newsletter')
-  async subscribeToNewsletter(@Res() res: Response) {
-    const connectionId = `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    this.broadcastService.addConnection(connectionId, res as any);
-
-    // Don't return response - keep connection alive
-  }
-
-  @Sse('time-no-comp')
-  sendTime1(
+  @Sse('time-no-cmpn')
+  sendTimeNoCompression(
     @Req() request: Request,
     @Query('msgs') msgs: string,
   ): Observable<MessageEvent> {
+    Logger.debug('New conn established', 'NO_COMPRESSION');
     const cleanup$ = new Subject<void>();
-    const id = (request as any)?.id as string;
+    const id = (request as any)?.id || this.generateConnectionId();
+
     SseController.cleanupMap.set(id, cleanup$);
 
     const int = interval(60000 / Number(msgs)).pipe(
@@ -149,17 +108,75 @@ export class SseController {
       map(() => ({
         data: JSON.stringify({
           time: new Date().toISOString(),
-          timestamp: Date.now(),
-          payload: generateLargePayload(),
+          payload: generateNewsletterJSON(),
           ...this.podInfo,
         }),
-        type: 'time-update',
+        type: 'time-no-cmpn',
       })),
     );
 
     this.setupRequestCleanup(request, id);
 
     return int;
+  }
+
+  @Get('time-http-compression')
+  timeStreamHTTP(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('msgs') msgs: string,
+  ) {
+    (res as any).setHeader('Content-Type', 'text/event-stream');
+    (res as any).setHeader('Cache-Control', 'no-cache');
+    (res as any).setHeader('Connection', 'keep-alive');
+    // (res as any).setHeader('Content-Encoding', 'br');
+    (res as any).setHeader('Content-Encoding', 'gz');
+    const gzip = zlib.createGzip({ flush: zlib.constants.Z_SYNC_FLUSH });
+    gzip.pipe(res as any);
+
+    // const brotli = zlib.createBrotliCompress({
+    //   flush: zlib.constants.BROTLI_OPERATION_FLUSH,
+    // });
+    // brotli.pipe(res as any);
+
+    const id = this.generateConnectionId();
+    const intervalMs = 60000 / Number(msgs || 60);
+
+    const timer = setInterval(() => {
+      //   brotli.write(
+      gzip.write(
+        `event: time-brotli\ndata: ${JSON.stringify({
+          payload: generateNewsletterJSON(),
+        })}\n\n`,
+      );
+    }, intervalMs);
+
+    (req as any).on('close', () => {
+      Logger.debug(`Cleaning up SSE connection ${id}`, 'BROTLI');
+      clearInterval(timer);
+      gzip.end();
+      //   brotli.end();
+    });
+  }
+
+  @Sse('newsletter')
+  sendNewsletter(
+    @Req() request: Request,
+    @Query('msgs') msgs: string,
+    @Query('enableCompression') enableCompression: string,
+  ): Observable<MessageEvent> {
+    const connectionId = this.generateConnectionId();
+    const cleanup$ = new Subject<void>();
+    SseController.cleanupMap.set(connectionId, cleanup$);
+
+    this.newsletterBroadcastService.addSSEConnection(
+      connectionId,
+      (request as any).res,
+      enableCompression === 'true',
+    );
+
+    this.setupRequestCleanup(request, connectionId);
+    return new Observable<MessageEvent>(() => {});
   }
 
   @Get('time-gzip')
@@ -197,7 +214,7 @@ export class SseController {
       const data = {
         time: new Date().toISOString(),
         timestamp: Date.now(),
-        payload: generateLargePayload(),
+        payload: generateNewsletterJSON(),
         ...this.podInfo,
       };
 
@@ -220,35 +237,14 @@ export class SseController {
     });
   }
 
-  @Sse('time3')
-  sendTime3(
-    @Req() request: Request,
-    @Query('msgs') msgs: string,
-  ): Observable<MessageEvent> {
-    const cleanup$ = new Subject<void>();
-    const id = (request as any)?.id as string;
-    SseController.cleanupMap.set(id, cleanup$);
-
-    const int = interval(60000 / Number(msgs)).pipe(
-      takeUntil(cleanup$),
-      map(() => ({
-        data: JSON.stringify({
-          time: new Date().toISOString(),
-          timestamp: Date.now(),
-          ...this.podInfo,
-        }),
-        type: 'time-update',
-      })),
-    );
-
-    this.setupRequestCleanup(request, id);
-
-    return int;
-  }
-
   private setupRequestCleanup(request: Request, clientId: string) {
-    this.logger.log(`SSE client connected: ${clientId}`);
     this.metricsService.recordSSEConnection('connect', clientId);
+
+    if ((request as any).destroyed || (request as any).closed) {
+      this.logger.warn(`Request already closed for client: ${clientId}`);
+      this.handleDisconnect(clientId);
+      return;
+    }
 
     (request as any).on('close', () => {
       this.handleDisconnect(clientId);
@@ -260,6 +256,11 @@ export class SseController {
   }
 
   private handleDisconnect(clientId: string) {
+    if (!clientId) {
+      this.logger.warn('Disconnect called with undefined clientId');
+      return;
+    }
+
     let cleanup$ = SseController.cleanupMap.get(clientId);
     if (cleanup$) {
       cleanup$.next();
@@ -294,13 +295,6 @@ export class SseController {
       this.handleDisconnect(connectionId);
       if (additionalCleanup) additionalCleanup();
     });
-  }
-
-  private updateConnectionBandwidth(connectionId: string, bytes: number) {
-    const connection = this.activeConnections.get(connectionId);
-    if (connection) {
-      connection.bytesWritten += bytes;
-    }
   }
 
   private trackConnection(

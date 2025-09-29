@@ -13,7 +13,7 @@ async function simulateWebSocketConnections(config?: {
   durationSeconds: number;
 }) {
   const {
-    url = 'ws://localhost:3000/performance',
+    url = 'wss://monitoring.local/performance',
     connectionCount = 100,
     messagesPerMinute = 10,
     durationSeconds = 120,
@@ -76,6 +76,12 @@ async function simulateWebSocketConnections(config?: {
 
     socket.on('message', (data) => {
       stats.messagesReceived++;
+      console.log(data);
+      const compressedSize = data.length;
+      socket.emit('report-compressed', {
+        compressedSize,
+        originalSize: data.originalSize,
+      });
     });
 
     socket.on('error', () => {

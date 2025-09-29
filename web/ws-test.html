@@ -324,8 +324,8 @@
           <input
             type="text"
             id="serverUrl"
-            value="wss://monitoring.local/performance"
-            placeholder="wss://your-server/performance"
+            value="wss://monitoring.local/with-cmpn"
+            placeholder="wss://your-server/with-cmpn"
           />
         </div>
 
@@ -546,30 +546,13 @@
           //  upgrade: true,
           //  rememberUpgrade: true,
           //});
-          const compressionTest = true;
+          const compressionTest = false;
           const socket = io(conn.url, {
             transports: ['websocket'],
             forceNew: true,
             upgrade: true,
             rememberUpgrade: true,
             // Enable compression for Socket.IO
-            compression: compressionTest,
-            perMessageDeflate: compressionTest
-              ? {
-                  threshold: 1024,
-                  concurrencyLimit: 10,
-                  serverMaxWindowBits: 15,
-                  clientMaxWindowBits: 15,
-                }
-              : false,
-            // Additional headers to request compression
-            extraHeaders: compressionTest
-              ? {
-                  'Accept-Encoding': 'gzip, deflate, br',
-                  'Sec-WebSocket-Extensions':
-                    'permessage-deflate; client_max_window_bits',
-                }
-              : {},
           });
 
           socket.on('connect', () => {
@@ -595,8 +578,11 @@
             card.querySelector('.disconnect-btn').disabled = false;
             card.querySelector('.send-btn').disabled = false;
 
-            socket.emit('message', {
-              message: `ConnectionID #${connectionId}, time: ${new Date().toISOString()}`,
+            socket.emit('meesage', {
+              type: 'config',
+              messagesPerMinute: 60,
+              clientId: 1,
+              timestamp: new Date().toISOString(),
             });
           });
 

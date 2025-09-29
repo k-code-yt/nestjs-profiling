@@ -26,6 +26,17 @@ spec:
               subPath: haproxy.cfg
             - name: ssl-certs
               mountPath: /etc/ssl/certs/
+        - name: haproxy-exporter
+          image: prom/haproxy-exporter:latest
+          ports:
+            - containerPort: 9101
+          args:
+            - --haproxy.scrape-uri=http://localhost:8080/stats?stats;csv
+            - --web.listen-address=:9101
+          resources:
+            requests:
+              memory: '64Mi'
+              cpu: '50m'
           # Use init container to prepare SSL certificates
       initContainers:
         - name: ssl-prep
@@ -82,3 +93,7 @@ spec:
       port: 8080
       targetPort: 8080
       nodePort: 30808
+    - name: metrics
+      port: 9101
+      targetPort: 9101
+      nodePort: 30901

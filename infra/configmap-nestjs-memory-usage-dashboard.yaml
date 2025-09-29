@@ -31,223 +31,24 @@ data:
               "legendFormat": "RSS (MB)"
             }
           ],
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 }
         },
         {
-          "id": 2,
-          "title": "Container Memory (1024MB Limit)",
-          "type": "gauge",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "nodejs_memory_usage_bytes{type=\"rss\"}",
-              "legendFormat": "Memory Usage"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bytes",
-              "min": 0,
-              "max": 1073741824,
-              "thresholds": {
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 629145600 },
-                  { "color": "red", "value": 838860800 }
-                ]
-              }
-            }
-          },
-          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 }
-        },
-        {
-          "id": 3,
-          "title": "HTTP Request Rate",
+          "id": 13,
+          "title": "HAProxy Total Bandwidth",
           "type": "timeseries",
           "datasource": "Prometheus",
           "targets": [
             {
-              "expr": "sum(rate(http_requests_total[1m]))",
-              "legendFormat": "Requests/sec"
-            }
-          ],
-          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 }
-        },
-        {
-          "id": 4,
-          "title": "Request Count by Endpoint",
-          "type": "timeseries",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "increase(http_requests_total[5m])",
-              "legendFormat": "{{method}} {{route}} ({{status_code}})"
-            }
-          ],
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
-        },
-        {
-          "id": 5,
-          "title": "Memory Usage by Endpoint",
-          "type": "timeseries",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "http_endpoint_memory_usage_mb",
-              "legendFormat": "{{method}} {{route}}"
-            }
-          ],
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
-        },
-        {
-          "id": 6,
-          "title": "HTTP Request Duration",
-          "type": "timeseries",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-              "legendFormat": "95th percentile"
+              "expr": "rate(haproxy_frontend_bytes_out_total[1m]) * 8 / 1024 / 1024",
+              "legendFormat": "Frontend Out (Mbps)"
             },
             {
-              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
-              "legendFormat": "50th percentile"
+              "expr": "rate(haproxy_backend_bytes_in_total[1m]) * 8 / 1024 / 1024",
+              "legendFormat": "Backend In (Mbps)"
             }
           ],
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
-        },
-        
-        {
-          "id": 9,
-          "title": "SSE Connections",
-          "type": "stat",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "sum(sse_connections_total{event=\"connect\"}) - sum(sse_connections_total{event=\"disconnect\"})",
-              "legendFormat": "Active Connections"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 800 },
-                  { "color": "red", "value": 1800 }
-                ]
-              }
-            }
-          },
-          "gridPos": { "h": 8, "w": 4, "x": 12, "y": 16 }
-        },
-        {
-          "id": 10,
-          "title": "WebSocket Connections",
-          "type": "stat",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "sum(websocket_connections_total{event=\"connect\"}) - sum(websocket_connections_total{event=\"disconnect\"})",
-              "legendFormat": "Active Connections"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 800 },
-                  { "color": "red", "value": 1800 }
-                ]
-              }
-            }
-          },
-          "gridPos": { "h": 8, "w": 4, "x": 16, "y": 16 }
-        },
-        {
-          "id": 11,
-          "title": "WebSocket Message Rate",
-          "type": "stat",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "sum(rate(websocket_messages_total[1m]))",
-              "legendFormat": "Messages/sec"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "reqps",
-              "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 80 },
-                  { "color": "red", "value": 100 }
-                ]
-              }
-            }
-          },
-          "gridPos": { "h": 8, "w": 4, "x": 20, "y": 16 }
-        },
-        {
-          "id": 7,
-          "title": "WebSocket Memory Usage",
-          "type": "timeseries",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "websocket_memory_usage_mb",
-              "legendFormat": "{{event}}"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "decbytes",
-              "displayName": "Memory (MB)"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
-        },
-        {
-          "id": 11,
-          "title": "WebSocket Memory Delta Distribution",
-          "type": "timeseries",
-          "datasource": "Prometheus",
-          "targets": [
-            {
-              "expr": "histogram_quantile(0.95, sum(rate(websocket_memory_delta_mb_bucket[5m])) by (le, event))",
-              "legendFormat": "95th percentile {{event}}"
-            },
-            {
-              "expr": "histogram_quantile(0.50, sum(rate(websocket_memory_delta_mb_bucket[5m])) by (le, event))",
-              "legendFormat": "50th percentile {{event}}"
-            },
-            {
-              "expr": "sum by (event) (websocket_memory_delta_mb_sum) / sum by (event) (websocket_memory_delta_mb_count)",
-              "legendFormat": "Average {{event}}"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "decbytes",
-              "displayName": "Memory Delta (MB)",
-              "custom": {
-                "axisPlacement": "auto",
-                "axisLabel": "Memory Change per Operation"
-              }
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 }
         },
         {
           "id": 12,
@@ -270,6 +71,10 @@ data:
             {
               "expr": "nodejs_memory_usage_bytes{type=\"external\"}",
               "legendFormat": "external-memory"
+            },
+            {
+              "expr": "nodejs_memory_usage_bytes{type=\"array_buffers\"}",
+              "legendFormat": "array-buffers"
             }
           ],
           "fieldConfig": {
@@ -382,6 +187,21 @@ data:
                     }
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "array-buffers"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#9467bd"
+                    }
+                  }
+                ]
               }
             ]
           },
@@ -395,10 +215,227 @@ data:
               "displayMode": "table",
               "placement": "right",
               "showLegend": true,
-              "width": 200
+              "width": 200,
+              "hideEmpty": false,
+              "hideZero": false
             }
           },
-          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 36 }
+          "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 }
+        },
+        {
+          "id": 2,
+          "title": "Container Memory (1024MB Limit)",
+          "type": "gauge",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "nodejs_memory_usage_bytes{type=\"rss\"}",
+              "legendFormat": "Memory Usage"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "min": 0,
+              "max": 1073741824,
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 629145600 },
+                  { "color": "red", "value": 838860800 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 28 }
+        },
+        {
+          "id": 3,
+          "title": "HTTP Request Rate",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[1m]))",
+              "legendFormat": "Requests/sec"
+            }
+          ],
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 28 }
+        },
+        {
+          "id": 9,
+          "title": "SSE Connections",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(sse_connections_total{event=\"connect\"}) - sum(sse_connections_total{event=\"disconnect\"})",
+              "legendFormat": "Active Connections"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 800 },
+                  { "color": "red", "value": 1800 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 4, "x": 12, "y": 28 }
+        },
+        {
+          "id": 10,
+          "title": "WebSocket Connections",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(websocket_connections_total{event=\"connect\"}) - sum(websocket_connections_total{event=\"disconnect\"})",
+              "legendFormat": "Active Connections"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 800 },
+                  { "color": "red", "value": 1800 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 4, "x": 16, "y": 28 }
+        },
+        {
+          "id": 11,
+          "title": "WebSocket Message Rate",
+          "type": "stat",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "sum(rate(websocket_messages_total[1m]))",
+              "legendFormat": "Messages/sec"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 80 },
+                  { "color": "red", "value": 100 }
+                ]
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 4, "x": 20, "y": 28 }
+        },
+        {
+          "id": 4,
+          "title": "Request Count by Endpoint",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "increase(http_requests_total[5m])",
+              "legendFormat": "{{method}} {{route}} ({{status_code}})"
+            }
+          ],
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 }
+        },
+        {
+          "id": 5,
+          "title": "Memory Usage by Endpoint",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "http_endpoint_memory_usage_mb",
+              "legendFormat": "{{method}} {{route}}"
+            }
+          ],
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 }
+        },
+        {
+          "id": 6,
+          "title": "HTTP Request Duration",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "95th percentile"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "50th percentile"
+            }
+          ],
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 }
+        },
+        {
+          "id": 7,
+          "title": "WebSocket Memory Usage",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "websocket_memory_usage_mb",
+              "legendFormat": "{{event}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decbytes",
+              "displayName": "Memory (MB)"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 }
+        },
+        {
+          "id": 11,
+          "title": "WebSocket Memory Delta Distribution",
+          "type": "timeseries",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(websocket_memory_delta_mb_bucket[5m])) by (le, event))",
+              "legendFormat": "95th percentile {{event}}"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(websocket_memory_delta_mb_bucket[5m])) by (le, event))",
+              "legendFormat": "50th percentile {{event}}"
+            },
+            {
+              "expr": "sum by (event) (websocket_memory_delta_mb_sum) / sum by (event) (websocket_memory_delta_mb_count)",
+              "legendFormat": "Average {{event}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decbytes",
+              "displayName": "Memory Delta (MB)",
+              "custom": {
+                "axisPlacement": "auto",
+                "axisLabel": "Memory Change per Operation"
+              }
+            }
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 52 }
         }
       ],
       "time": {

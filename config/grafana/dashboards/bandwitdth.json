@@ -350,6 +350,23 @@
         ]
       },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 }
+    },
+    {
+      "id": 13,
+      "title": "HAProxy Total Bandwidth",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(haproxy_frontend_bytes_out_total[1m]) * 8 / 1024 / 1024",
+          "legendFormat": "Frontend Out (Mbps)"
+        },
+        {
+          "expr": "rate(haproxy_backend_bytes_in_total[1m]) * 8 / 1024 / 1024",
+          "legendFormat": "Backend In (Mbps)"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 }
     }
   ],
   "time": {

@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
-import { WebsocketGateway } from './ws/ws.service';
-import { SSEBroadcastService } from './sse/sse-broadcast.service';
+import { WebsocketGatewayWithCompression } from './ws/ws-with-cmpn.service';
 import { SseController } from './sse/sse.controller';
 import { WSMemoryTrackingInterceptor } from './ws/ws-tracking.interceptor';
-import { ChatWebsocketGateway } from './ws/chat-room-ws.service';
+import { WebsocketGatewayNoCompression } from './ws/ws-no-cmpn.service';
+import { NewsletterBroadcastService } from './newsletter-broadcast-shared.service';
 
 @Module({
   providers: [
-    ChatWebsocketGateway,
-    WebsocketGateway,
-    SSEBroadcastService,
+    WebsocketGatewayNoCompression,
+    WebsocketGatewayWithCompression,
+    NewsletterBroadcastService,
     WSMemoryTrackingInterceptor,
   ],
   controllers: [SseController],

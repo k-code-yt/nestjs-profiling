@@ -47,9 +47,6 @@ spec:
             - name: grafana-dashboard-nestjs
               mountPath: /var/lib/grafana/dashboards/nestjs-memory-profiling.json
               subPath: nestjs-memory-profiling.json
-            - name: grafana-dashboard-bandwidth
-              mountPath: /var/lib/grafana/dashboards/bandwidth-monitoring.json
-              subPath: bandwidth-monitoring.json
           resources:
             limits:
               memory: '512Mi'
@@ -74,9 +71,6 @@ spec:
         - name: grafana-dashboard-nestjs
           configMap:
             name: grafana-dashboard-nestjs
-        - name: grafana-dashboard-bandwidth
-          configMap:
-            name: grafana-dashboard-bandwidth
 
 ---
 # service-grafana.yml

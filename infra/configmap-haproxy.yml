@@ -41,6 +41,8 @@ data:
         stats uri /
         stats refresh 10s
         stats admin if TRUE
+        stats admin if TRUE
+        stats show-legends
 
     # HTTP frontend - redirect to HTTPS
     frontend http_frontend
