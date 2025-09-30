@@ -151,7 +151,7 @@ export class NewsletterBroadcastService {
     this.wsServer.emit('message', {
       data: compressedData,
       type: 'message',
-      //   compressed: this.enableCompression,
+    //   compressed: this.enableCompression,
       totalWSConnections: wsConnections.length,
     });
   }

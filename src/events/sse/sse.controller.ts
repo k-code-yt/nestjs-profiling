@@ -6,13 +6,12 @@ import {
   Req,
   Query,
   Get,
-  Header,
   Res,
 } from '@nestjs/common';
 import { Observable, Subject, interval, map, takeUntil, tap } from 'rxjs';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 import * as zlib from 'zlib';
-import { generateNewsletterJSON } from '../helper';
+import { StaticService } from '../helper';
 import { NewsletterBroadcastService } from '../newsletter-broadcast-shared.service';
 
 type PodInfo = {
@@ -38,6 +37,7 @@ export class SseController {
   constructor(
     private readonly metricsService: PrometheusMetricsService,
     private readonly newsletterBroadcastService: NewsletterBroadcastService,
+    private readonly staticService: StaticService,
   ) {
     this.podInfo = {
       podName: process.env.POD_NAME || process.env.HOSTNAME || 'localhost',
@@ -73,7 +73,7 @@ export class SseController {
       const data = {
         time: new Date().toISOString(),
         timestamp: Date.now(),
-        payload: generateNewsletterJSON(),
+        payload: this.staticService.getNewPayload(),
         eventId: eventId,
         compressionType: 'brotli',
         ...this.podInfo,
@@ -108,7 +108,7 @@ export class SseController {
       map(() => ({
         data: JSON.stringify({
           time: new Date().toISOString(),
-          payload: generateNewsletterJSON(),
+          payload: this.staticService.getNewPayload(),
           ...this.podInfo,
         }),
         type: 'time-no-cmpn',
@@ -118,45 +118,6 @@ export class SseController {
     this.setupRequestCleanup(request, id);
 
     return int;
-  }
-
-  @Get('time-http-compression')
-  timeStreamHTTP(
-    @Req() req: Request,
-    @Res() res: Response,
-    @Query('msgs') msgs: string,
-  ) {
-    (res as any).setHeader('Content-Type', 'text/event-stream');
-    (res as any).setHeader('Cache-Control', 'no-cache');
-    (res as any).setHeader('Connection', 'keep-alive');
-    // (res as any).setHeader('Content-Encoding', 'br');
-    (res as any).setHeader('Content-Encoding', 'gz');
-    const gzip = zlib.createGzip({ flush: zlib.constants.Z_SYNC_FLUSH });
-    gzip.pipe(res as any);
-
-    // const brotli = zlib.createBrotliCompress({
-    //   flush: zlib.constants.BROTLI_OPERATION_FLUSH,
-    // });
-    // brotli.pipe(res as any);
-
-    const id = this.generateConnectionId();
-    const intervalMs = 60000 / Number(msgs || 60);
-
-    const timer = setInterval(() => {
-      //   brotli.write(
-      gzip.write(
-        `event: time-brotli\ndata: ${JSON.stringify({
-          payload: generateNewsletterJSON(),
-        })}\n\n`,
-      );
-    }, intervalMs);
-
-    (req as any).on('close', () => {
-      Logger.debug(`Cleaning up SSE connection ${id}`, 'BROTLI');
-      clearInterval(timer);
-      gzip.end();
-      //   brotli.end();
-    });
   }
 
   @Sse('newsletter')
@@ -179,61 +140,37 @@ export class SseController {
     return new Observable<MessageEvent>(() => {});
   }
 
-  @Get('time-gzip')
-  @Header('Content-Type', 'text/event-stream')
-  @Header('Content-Encoding', 'gzip')
-  @Header(
-    'Cache-Control',
-    'private, no-cache, no-store, must-revalidate, max-age=0, no-transform',
-  )
-  @Header('Connection', 'keep-alive')
-  @Header('X-Accel-Buffering', 'no')
-  async getTimeStreamCompressed2(@Res() res: Response) {
-    const gzip = zlib.createGzip({
-      level: 1,
-      chunkSize: 256,
-      windowBits: 15,
-      memLevel: 8,
-      strategy: zlib.constants.Z_FILTERED,
-      flush: zlib.constants.Z_SYNC_FLUSH,
-    });
-
+  @Get('time-http-compression')
+  timeStreamHTTP(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('msgs') msgs: string,
+  ) {
     (res as any).setHeader('Content-Type', 'text/event-stream');
-    (res as any).setHeader('Content-Encoding', 'gzip');
-    (res as any).setHeader(
-      'Cache-Control',
-      'private, no-cache, no-store, must-revalidate, max-age=0, no-transform',
-    );
+    (res as any).setHeader('Cache-Control', 'no-cache');
     (res as any).setHeader('Connection', 'keep-alive');
-    (res as any).setHeader('X-Accel-Buffering', 'no');
+    (res as any).setHeader('Content-Encoding', 'br');
 
-    gzip.pipe(res as any);
-
-    let eventId = 1;
-    const intervalId = setInterval(() => {
-      const data = {
-        time: new Date().toISOString(),
-        timestamp: Date.now(),
-        payload: generateNewsletterJSON(),
-        ...this.podInfo,
-      };
-
-      const sseData = `event: time-update\nid: ${eventId++}\ndata: ${JSON.stringify(data)}\n\n`;
-
-      gzip.write(sseData, () => {
-        gzip.flush(zlib.constants.Z_SYNC_FLUSH);
-      });
-    }, 1000);
-
-    (res as any).on('close', () => {
-      clearInterval(intervalId);
-      gzip.end();
+    const brotli = zlib.createBrotliCompress({
+      flush: zlib.constants.BROTLI_OPERATION_FLUSH,
     });
+    brotli.pipe(res as any);
 
-    (res as any).on('error', (err) => {
-      console.error('Response error:', err);
-      clearInterval(intervalId);
-      gzip.end();
+    const id = this.generateConnectionId();
+    const intervalMs = 60000 / Number(msgs || 60);
+
+    const timer = setInterval(() => {
+      brotli.write(
+        `event: time-brotli\ndata: ${JSON.stringify({
+          payload: this.staticService.getNewPayload(),
+        })}\n\n`,
+      );
+    }, intervalMs);
+
+    (req as any).on('close', () => {
+      Logger.debug(`Cleaning up SSE connection ${id}`, 'BROTLI');
+      clearInterval(timer);
+      brotli.end();
     });
   }
 

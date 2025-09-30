@@ -2,6 +2,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+
+import { Socket } from 'socket.io';
+
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 export const io = require('socket.io-client');
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
@@ -26,7 +29,7 @@ async function simulateWebSocketConnections(config?: {
     startTime: Date.now(),
   };
 
-  const connections = [];
+  const connections: { socket: Socket; int: number | null }[] = [];
   const compressionTest = true;
   for (let i = 0; i < connectionCount; i++) {
     const socket = io(url, {
@@ -89,7 +92,7 @@ async function simulateWebSocketConnections(config?: {
       socket?.disconnect();
     });
 
-    connections.push({ socket, int: null } as never);
+    connections.push({ socket, int: null });
 
     if (i % 50 === 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -98,8 +101,10 @@ async function simulateWebSocketConnections(config?: {
 
   await new Promise((resolve) => setTimeout(resolve, durationSeconds * 1000));
 
-  connections.forEach(({ socket, interval }) => {
-    clearInterval(interval);
+  connections.forEach(({ socket, int }) => {
+    if (int) {
+      clearInterval(int);
+    }
     (socket as any).removeAllListeners();
     (socket as any).disconnect(true);
   });

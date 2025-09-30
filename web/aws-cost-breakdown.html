@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AWS Compression Cost Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      h1 {
+        text-align: center;
+        color: #38bdf8;
+        margin-bottom: 10px;
+      }
+      .subtitle {
+        text-align: center;
+        color: #94a3b8;
+        margin-bottom: 30px;
+      }
+      .chart-container {
+        position: relative;
+        height: 500px;
+        margin-bottom: 40px;
+        background: #1e293b;
+        padding: 20px;
+        border-radius: 8px;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+        margin-top: 30px;
+      }
+      .stat-card {
+        background: #1e293b;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #38bdf8;
+      }
+      .stat-card h3 {
+        margin: 0 0 15px 0;
+        color: #38bdf8;
+        font-size: 18px;
+        font-weight: bold;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #10b981;
+        margin: 10px 0;
+      }
+      .cost-breakdown {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 10px;
+      }
+      .breakdown-section {
+        background: #0f172a;
+        padding: 15px;
+        border-radius: 6px;
+      }
+      .breakdown-section h4 {
+        margin: 0 0 10px 0;
+        color: #94a3b8;
+        font-size: 12px;
+        text-transform: uppercase;
+        font-weight: 600;
+      }
+      .breakdown-line {
+        font-size: 13px;
+        color: #cbd5e1;
+        margin: 5px 0;
+        font-family: 'Courier New', monospace;
+      }
+      .breakdown-total {
+        font-weight: bold;
+        color: #e2e8f0;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #334155;
+      }
+      .savings-highlight {
+        background: #064e3b;
+        padding: 10px;
+        border-radius: 6px;
+        margin-top: 10px;
+        text-align: center;
+      }
+      .break-even {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border-left: 4px solid #f59e0b;
+      }
+      .break-even strong {
+        color: #b45309;
+      }
+      .assumption {
+        background: #1e293b;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 20px 0;
+        border-left: 4px solid #6366f1;
+        color: #cbd5e1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>AWS Cost Analysis: Compression vs No Compression</h1>
+    <div class="subtitle">
+      t3.xlarge instances ($119.81/month) - Showing compute, bandwidth, and
+      total costs
+    </div>
+
+    <div class="assumption">
+      <strong>Assumptions:</strong>
+      <ul style="margin: 10px 0 0 0; padding-left: 20px">
+        <li>Compression reduces bandwidth by 70%</li>
+        <li>Compression adds 30% CPU/RAM overhead requiring more instances</li>
+        <li>~10 TB bandwidth per instance before scaling needed</li>
+        <li>With compression overhead, ~7.7 TB bandwidth per instance</li>
+      </ul>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="costChart"></canvas>
+    </div>
+
+    <div class="break-even">
+      <strong>Break-Even Analysis:</strong> At approximately 5 TB/month
+      bandwidth, compression starts becoming beneficial.(with free tier) The
+      additional compute cost from compression overhead is offset by bandwidth
+      savings.
+    </div>
+
+    <div class="stats-grid">
+      <!-- 0.5 TB -->
+      <div class="stat-card">
+        <h3>0.5 TB/month</h3>
+        <div class="cost-breakdown">
+          <div class="breakdown-section">
+            <h4>Without Compression</h4>
+            <div class="breakdown-line">
+              Compute: 1 instance × $119.81 = $119.81
+            </div>
+            <div class="breakdown-line">Bandwidth: 0.5 TB × $90 = $45.00</div>
+            <div class="breakdown-total">Total: $164.81</div>
+          </div>
+          <div class="breakdown-section">
+            <h4>With Compression</h4>
+            <div class="breakdown-line">
+              Compute: 1 instance × $119.81 = $119.81
+            </div>
+            <div class="breakdown-line">Bandwidth: 0.15 TB × $90 = $13.50</div>
+            <div class="breakdown-total">Total: $133.31</div>
+          </div>
+        </div>
+        <div class="savings-highlight">
+          <div class="stat-value">$31.50 savings/month</div>
+          <div style="color: #94a3b8; font-size: 14px">
+            19.1% cost reduction
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 TB -->
+      <div class="stat-card">
+        <h3>2 TB/month</h3>
+        <div class="cost-breakdown">
+          <div class="breakdown-section">
+            <h4>Without Compression</h4>
+            <div class="breakdown-line">
+              Compute: 2 instances × $119.81 = $239.62
+            </div>
+            <div class="breakdown-line">Bandwidth: 2 TB × $90 = $180.00</div>
+            <div class="breakdown-total">Total: $419.62</div>
+          </div>
+          <div class="breakdown-section">
+            <h4>With Compression</h4>
+            <div class="breakdown-line">
+              Compute: 3 instances × $119.81 = $359.43
+            </div>
+            <div class="breakdown-line">Bandwidth: 0.6 TB × $90 = $54.00</div>
+            <div class="breakdown-total">Total: $413.43</div>
+          </div>
+        </div>
+        <div class="savings-highlight">
+          <div class="stat-value">$6.19 savings/month</div>
+          <div style="color: #94a3b8; font-size: 14px">1.5% cost reduction</div>
+        </div>
+      </div>
+
+      <!-- 5 TB -->
+      <div class="stat-card">
+        <h3>5 TB/month</h3>
+        <div class="cost-breakdown">
+          <div class="breakdown-section">
+            <h4>Without Compression</h4>
+            <div class="breakdown-line">
+              Compute: 5 instances × $119.81 = $599.05
+            </div>
+            <div class="breakdown-line">Bandwidth: 5 TB × $90 = $450.00</div>
+            <div class="breakdown-total">Total: $1,049.05</div>
+          </div>
+          <div class="breakdown-section">
+            <h4>With Compression</h4>
+            <div class="breakdown-line">
+              Compute: 7 instances × $119.81 = $838.67
+            </div>
+            <div class="breakdown-line">Bandwidth: 1.5 TB × $90 = $135.00</div>
+            <div class="breakdown-total">Total: $973.67</div>
+          </div>
+        </div>
+        <div class="savings-highlight">
+          <div class="stat-value">$75.38 savings/month</div>
+          <div style="color: #94a3b8; font-size: 14px">7.2% cost reduction</div>
+        </div>
+      </div>
+
+      <!-- 10 TB -->
+      <div class="stat-card">
+        <h3>10 TB/month</h3>
+        <div class="cost-breakdown">
+          <div class="breakdown-section">
+            <h4>Without Compression</h4>
+            <div class="breakdown-line">
+              Compute: 10 instances × $119.81 = $1,198.10
+            </div>
+            <div class="breakdown-line">Bandwidth: 10 TB × $90 = $900.00</div>
+            <div class="breakdown-total">Total: $2,098.10</div>
+          </div>
+          <div class="breakdown-section">
+            <h4>With Compression</h4>
+            <div class="breakdown-line">
+              Compute: 13 instances × $119.81 = $1,557.53
+            </div>
+            <div class="breakdown-line">Bandwidth: 3 TB × $90 = $270.00</div>
+            <div class="breakdown-total">Total: $1,827.53</div>
+          </div>
+        </div>
+        <div class="savings-highlight">
+          <div class="stat-value">$270.57 savings/month</div>
+          <div style="color: #94a3b8; font-size: 14px">
+            12.9% cost reduction
+          </div>
+        </div>
+      </div>
+
+      <!-- 20 TB -->
+      <div class="stat-card">
+        <h3>20 TB/month</h3>
+        <div class="cost-breakdown">
+          <div class="breakdown-section">
+            <h4>Without Compression</h4>
+            <div class="breakdown-line">
+              Compute: 20 instances × $119.81 = $2,396.20
+            </div>
+            <div class="breakdown-line">Bandwidth: (10×$90)+(10×$85)</div>
+            <div class="breakdown-line">= $900 + $850 = $1,750.00</div>
+            <div class="breakdown-total">Total: $4,146.20</div>
+          </div>
+          <div class="breakdown-section">
+            <h4>With Compression</h4>
+            <div class="breakdown-line">
+              Compute: 26 instances × $119.81 = $3,115.06
+            </div>
+            <div class="breakdown-line">Bandwidth: 6 TB × $90 = $540.00</div>
+            <div class="breakdown-total">Total: $3,655.06</div>
+          </div>
+        </div>
+        <div class="savings-highlight">
+          <div class="stat-value">$491.14 savings/month</div>
+          <div style="color: #94a3b8; font-size: 14px">
+            11.8% cost reduction
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const ctx = document.getElementById('costChart').getContext('2d');
+
+      const bandwidthLevels = [
+        0.25, 0.5, 0.75, 1, 1.33, 2, 3, 5, 7, 10, 15, 20,
+      ];
+
+      function calculateBandwidthCost(tb) {
+        let cost = 0;
+        if (tb <= 10) {
+          cost = tb * 90;
+        } else if (tb <= 50) {
+          cost = 10 * 90 + (tb - 10) * 85;
+        } else if (tb <= 150) {
+          cost = 10 * 90 + 40 * 85 + (tb - 50) * 70;
+        } else {
+          cost = 10 * 90 + 40 * 85 + 100 * 70 + (tb - 150) * 50;
+        }
+        return cost;
+      }
+
+      // Without compression (1 instance per TB)
+      const computeWithout = bandwidthLevels.map((tb) => {
+        const instances = Math.max(1, Math.ceil(tb / 1));
+        return instances * 119.81;
+      });
+
+      const bandwidthWithout = bandwidthLevels.map((tb) =>
+        calculateBandwidthCost(tb),
+      );
+      const totalWithout = computeWithout.map(
+        (c, i) => c + bandwidthWithout[i],
+      );
+
+      // With compression (30% more instances needed due to compression overhead)
+      const computeWith = bandwidthLevels.map((tb) => {
+        const instancesNeeded = Math.ceil(tb / 1); // 1 instance per TB
+        const instancesWithOverhead = Math.ceil(instancesNeeded * 1.3);
+        return instancesWithOverhead * 119.81;
+      });
+
+      const bandwidthWith = bandwidthLevels.map((tb) =>
+        calculateBandwidthCost(tb * 0.3),
+      );
+      const totalWith = computeWith.map((c, i) => c + bandwidthWith[i]);
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: bandwidthLevels.map((tb) => tb + ' TB'),
+          datasets: [
+            {
+              label: 'Total Cost - Without Compression',
+              data: totalWithout,
+              borderColor: '#ef4444',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              borderWidth: 3,
+              tension: 0.1,
+              pointRadius: 5,
+              pointHoverRadius: 7,
+            },
+            {
+              label: 'Total Cost - With Compression',
+              data: totalWith,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderWidth: 3,
+              tension: 0.1,
+              pointRadius: 5,
+              pointHoverRadius: 7,
+            },
+            {
+              label: 'Compute Only - Without Compression',
+              data: computeWithout,
+              borderColor: '#f97316',
+              backgroundColor: 'rgba(249, 115, 22, 0.1)',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              tension: 0.1,
+              pointRadius: 3,
+            },
+            {
+              label: 'Compute Only - With Compression',
+              data: computeWith,
+              borderColor: '#14b8a6',
+              backgroundColor: 'rgba(20, 184, 166, 0.1)',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              tension: 0.1,
+              pointRadius: 3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                color: '#e2e8f0',
+                font: {
+                  size: 12,
+                },
+                padding: 15,
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  return (
+                    context.dataset.label + ': $' + context.parsed.y.toFixed(2)
+                  );
+                },
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Monthly Cost (USD)',
+                color: '#94a3b8',
+                font: {
+                  size: 14,
+                },
+              },
+              ticks: {
+                color: '#94a3b8',
+                callback: function (value) {
+                  return '$' + value.toLocaleString();
+                },
+              },
+              grid: {
+                color: '#334155',
+              },
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Monthly Bandwidth',
+                color: '#94a3b8',
+                font: {
+                  size: 14,
+                },
+              },
+              ticks: {
+                color: '#94a3b8',
+              },
+              grid: {
+                color: '#334155',
+              },
+            },
+          },
+        },
+      });
+    </script>
+  </body>
+</html>

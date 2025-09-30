@@ -30,7 +30,6 @@ data:
         timeout http-keep-alive 10s
         timeout http-request 15s
         
-        # CRITICAL: Compression for streaming (remove offload from defaults)
         compression algo gzip deflate
         compression type text/html text/css text/javascript text/plain text/xml application/javascript application/json text/event-stream application/xml application/rss+xml image/svg+xml
 

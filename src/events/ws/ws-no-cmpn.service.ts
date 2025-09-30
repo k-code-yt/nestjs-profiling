@@ -15,7 +15,7 @@ import { WSConnectionTracker } from './ws-connection-tracker';
 import { MemoryProfilingService } from '../../profiling/mem-profiling.service';
 import { PrometheusMetricsService } from '../../profiling/prom-metrics.service';
 import * as os from 'os';
-import { generateNewsletterJSON } from '../helper';
+import { StaticService } from '../helper';
 import { NewsletterBroadcastService } from '../newsletter-broadcast-shared.service';
 
 interface PodInfo {
@@ -30,8 +30,6 @@ interface PodInfo {
     credentials: true,
   },
   namespace: 'no-cmpn',
-  pingTimeout: 60000,
-  pingInterval: 25000,
 })
 export class WebsocketGatewayNoCompression
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -46,6 +44,7 @@ export class WebsocketGatewayNoCompression
     private readonly memoryProfilingService: MemoryProfilingService,
     private readonly prometheusMetricsService: PrometheusMetricsService,
     private readonly newsletterBroadcastService: NewsletterBroadcastService,
+    private readonly staticService: StaticService,
   ) {
     this.connectionTracker = new WSConnectionTracker(
       this.memoryProfilingService,
@@ -69,8 +68,6 @@ export class WebsocketGatewayNoCompression
     );
 
     this.connectionTracker.trackConnection('connect', client);
-
-    // this.newsletterBroadcastService.addWSConnection(client.id, client);
   }
 
   handleDisconnect(client: Socket) {
@@ -87,10 +84,6 @@ export class WebsocketGatewayNoCompression
 
   @SubscribeMessage('message')
   handleMessage(@MessageBody() data: any, @ConnectedSocket() client: Socket) {
-    this.logger.log(
-      `Received message from ${client.id}: ${JSON.stringify(data)}`,
-    );
-
     let originalMsg: {
       type: string;
       messagesPerMinute: number;
@@ -105,10 +98,11 @@ export class WebsocketGatewayNoCompression
     }
 
     const messagesPerMinute = originalMsg?.messagesPerMinute || 60;
+
     this.logger.debug(`recieved msg per min ${messagesPerMinute}`);
     const interval = setInterval(
       () => {
-        const payload = JSON.stringify(generateNewsletterJSON());
+        const payload = JSON.stringify(this.staticService.getNewPayload());
         const messageData = {
           payload,
           ...this.podInfo,
@@ -119,7 +113,7 @@ export class WebsocketGatewayNoCompression
 
         client.emit('message', messageData);
       },
-      60000 / Number(originalMsg.messagesPerMinute),
+      60000 / Number(messagesPerMinute),
     );
 
     (client as any).largeDataInterval = interval;

@@ -4,6 +4,7 @@ import { SseController } from './sse/sse.controller';
 import { WSMemoryTrackingInterceptor } from './ws/ws-tracking.interceptor';
 import { WebsocketGatewayNoCompression } from './ws/ws-no-cmpn.service';
 import { NewsletterBroadcastService } from './newsletter-broadcast-shared.service';
+import { StaticService } from './helper';
 
 @Module({
   providers: [
@@ -11,6 +12,7 @@ import { NewsletterBroadcastService } from './newsletter-broadcast-shared.servic
     WebsocketGatewayWithCompression,
     NewsletterBroadcastService,
     WSMemoryTrackingInterceptor,
+    StaticService,
   ],
   controllers: [SseController],
 })

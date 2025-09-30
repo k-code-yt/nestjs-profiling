@@ -1,3 +1,21 @@
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class StaticService {
+  private payload: string = '';
+  onModuleInit() {
+    this.payload = JSON.stringify(generateLargePayload());
+  }
+
+  getCachedPayload() {
+    return this.payload;
+  }
+
+  getNewPayload() {
+    return generateLargePayload();
+  }
+}
+
 export const generateLargePayload = () => {
   const baseData = {
     time: new Date().toISOString(),
@@ -43,7 +61,7 @@ export const generateLargePayload = () => {
   };
 
   const jsonStr = JSON.stringify(baseData);
-  const targetSize = 50240; // 50kb
+  const targetSize = 1024;
   if (jsonStr.length < targetSize) {
     baseData['padding'] = 'x'.repeat(Math.floor(targetSize - jsonStr.length));
   }
@@ -516,13 +534,8 @@ function generatePaddingContent(targetBytes: number): string {
   let padding = '';
 
   while (padding.length < targetBytes - 100) {
-    // Leave small buffer
     padding += words[Math.floor(Math.random() * words.length)] + ' ';
   }
 
   return padding.trim();
 }
-
-// Example usage:
-// const newsletter50KB = generateNewsletterJSON(50);
-// const newsletter100KB = generateNewsletterJSON(100);

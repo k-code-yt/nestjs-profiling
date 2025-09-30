@@ -578,7 +578,7 @@
             card.querySelector('.disconnect-btn').disabled = false;
             card.querySelector('.send-btn').disabled = false;
 
-            socket.emit('meesage', {
+            socket.emit('message', {
               type: 'config',
               messagesPerMinute: 60,
               clientId: 1,

@@ -31,13 +31,13 @@ interface PodInfo {
   },
   namespace: 'with-cmpn',
 
-  //   compression: true,
-  //   perMessageDeflate: true,
-  //   transports: ['websocket'],
-  //   allowEIO3: false,
-  //   httpCompression: true,
-  //   pingTimeout: 60000,
-  //   pingInterval: 25000,
+  compression: true,
+  perMessageDeflate: true,
+  transports: ['websocket'],
+  allowEIO3: false,
+  httpCompression: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
 })
 export class WebsocketGatewayWithCompression
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
